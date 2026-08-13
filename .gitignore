@@ -1,0 +1,19 @@
+# Ignore sensitive API keys
+token.env
+.venv/
+
+#OS/IDE
+.DS_Store
+.vscode/
+.idea/
+
+# Ignore data files and large models
+data/raw/
+data/processed/
+models/*.pkl
+
+# Python 
+.ipynb_checkpoints/
+.pytest_cache/
+__pycache__/
+empty_python.py
