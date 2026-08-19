@@ -4,8 +4,10 @@ FEATURE_GROUPS = {
     # Target Model: XGBoost or Random Forest (Specialist in structural/macro regime shifts)
     # -------------------------------------------------------------------------
     "onchain_features": [
-        "aviv",
-        "mvrv",
+        #"aviv",
+        #"mvrv",
+        "aviv_fracdiff",  # Transformed via FracDiff 
+        "mvrv_fracdiff",  # Transformed via FracDiff 
         "nupl",
         "sopr",
         "age_0d_1d",
@@ -40,6 +42,7 @@ FEATURE_GROUPS = {
         #"macdsignal_pct", 
         #"macdhist_pct", 
         #"nrplbtc_log"
+        "nrplbtc_log_fracdiff"
     ],
     # -------------------------------------------------------------------------
     # Group 2: Derivatives & Market Microstructure (5 features)
@@ -57,6 +60,7 @@ FEATURE_GROUPS = {
     # Target Model: Linear SVM or Ridge Classifier (Specialist in trend-following)
     # -------------------------------------------------------------------------
     "technicals_features": [
+        "Close_fracdiff",  # Transformed BTC spot price via FracDiff
         "yf_hl_spread_pct",
         "yf_atr14_pct",
         "yf_bollinger_pct_b",
