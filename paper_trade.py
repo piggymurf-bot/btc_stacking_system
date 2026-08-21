@@ -293,15 +293,14 @@ def has_traded_today():
 def execute_paper_trade():
     """Calculates rebalance requirements and executes simulated trade."""
     
+    if has_traded_today():
+      print("⏸️ Already executed a paper trade today. Skipping duplicate run.")
+      return
     
     # 1. Get live price and prediction
     df_market = fetch_daily_data()
     model_prob, target_pos, current_price = generate_live_signal(df_market)
     
-    if has_traded_today():
-      print("⏸️ Already executed a paper trade today. Skipping duplicate run.")
-      return
-
     init_db()
     state = get_portfolio_state()
 
