@@ -22,14 +22,14 @@ def extract_bgeometrics_features(bg_data: pd.DataFrame) -> pd.DataFrame:
     #Log-transform raw capital volumes to compress exponential variance spikes
     #We use a signed log transformation because nrplbtc contains negative numbers
     df['nrplbtc_log'] = np.sign(df['nrplbtc']) * np.log1p(df['nrplbtc'].abs())
-
+    
     #Collect all safe features 
     safe_features = [
         'aviv', 'mvrv', 'nupl', 'sopr', 
     
         #Treated features
         'macd_pct', 'macdsignal_pct', 'macdhist_pct', 'nrplbtc_log'
-    ]
+    ] 
 
     #Include also age cohorts 
     age_columns = [col for col in df.columns if col.startswith('age_')]
@@ -37,6 +37,10 @@ def extract_bgeometrics_features(bg_data: pd.DataFrame) -> pd.DataFrame:
 
     #Put all viable features into a new DataFrame
     features_df = df[safe_features]
+    
+    for col in features_df.columns:
+        if col not in ["date", "timestamp"]:
+            features_df[col] = pd.to_numeric(features_df[col], errors="coerce")
 
     #Add more features, which are the day-to-day difference and target variable
 

@@ -1,4 +1,3 @@
-import os
 import pandas as pd
 from src.data.bgeometrics_loader import fetch_and_merge_bgeometrics
 from src.data.binance_vision import fetch_and_process_binance_vision
@@ -19,6 +18,10 @@ def run_full_data_pipeline(api_token: str, symbol: str = 'BTCUSDT'):
   yf_buffered_start = (pd.to_datetime(bg_df['date'].iloc[0]) - pd.Timedelta(days=100)).strftime(
     '%Y-%m-%d'
     )
+  #Add 1 more day for the Yahoo Finance dataset.. to get the latest data on the same day
+  yf_buffered_end = (
+          pd.to_datetime(bg_df['date'].iloc[-1]) + pd.Timedelta(days=1)
+      ).strftime('%Y-%m-%d')
 
   # Step 2: Fetch Binance Vision
   fetch_and_process_binance_vision(symbol, start_date_str=start_date)
@@ -28,7 +31,7 @@ def run_full_data_pipeline(api_token: str, symbol: str = 'BTCUSDT'):
 
   # Step 4: Fetch YFinance Price Action
   fetch_yfinance_data(
-      symbol='BTC-USD', start_date_str=yf_buffered_start, end_date_str=end_date
+      symbol='BTC-USD', start_date_str=yf_buffered_start, end_date_str=yf_buffered_end
   )
 
   print('\n=== ALL DATA SOURCES SUCCESSFULLY DOWNLOADED & SAVED TO data/raw/ ===')

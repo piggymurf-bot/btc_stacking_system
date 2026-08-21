@@ -16,7 +16,7 @@ def fetch_yfinance_data(
   )
 
   btc_data = yf.download(
-      symbol, start=start_date_str, end=end_date_str, progress=False
+      symbol, start=start_date_str, end=end_date_str, progress=False, repair=True
   )
 
   # Flatten MultiIndex columns if yfinance returns nested headers

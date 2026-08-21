@@ -61,6 +61,9 @@ def process_and_merge_csvs(raw_dir: str = 'data/raw', out_dir: str = 'data/proce
       
     # List of cumulative non-stationary features to transform
     non_stationary_cols = ['Close', 'mvrv', 'aviv', 'nrplbtc_log']
+    
+    # Assign the DataFrame to collect optimum d
+    d_opt_df = pd.DataFrame(columns=non_stationary_cols,index=range(1))
 
     for col in non_stationary_cols:
         print(f'Finding optimal d* for {col}...')
@@ -75,6 +78,9 @@ def process_and_merge_csvs(raw_dir: str = 'data/raw', out_dir: str = 'data/proce
 
         # 3. Apply FFD using optimal d*
         master_df[f'{col}_fracdiff'] = frac_diff_ffd(series_to_diff, d=optimal_d)
+        
+        # 4. Collect the optimal d* for each column
+        d_opt_df[f'{col}'] = optimal_d
 
     # Attach Target Variable y (Predicting 3-day forward SMA movement)
     master_df = add_target_variable(
@@ -88,6 +94,10 @@ def process_and_merge_csvs(raw_dir: str = 'data/raw', out_dir: str = 'data/proce
     # Save merged dataset
     master_path = os.path.join(out_dir, 'master_features_and_target.csv')
     master_df.to_csv(master_path, index=True)
+    
+    # Save optimal d for processing daily dataset 
+    d_opt_path = os.path.join(out_dir, 'optimal_d.csv')
+    d_opt_df.to_csv(d_opt_path, index=True)
     
     print('\n=== DOWNLOADED DATA SUCCESSFULLY PROCESSED & SAVED TO data/processed/ ===')
     print(f'Master Dataset Shape: {master_df.shape[0]} rows x {master_df.shape[1]} columns')

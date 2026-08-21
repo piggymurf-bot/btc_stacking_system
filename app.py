@@ -7,6 +7,8 @@ import streamlit as st
 
 from src.backtest.engine import VectorizedBacktester
 
+#run this file in command prompt by: streamlit run app.py
+
 # -----------------------------------------------------------------------------
 # PAGE CONFIGURATION
 # -----------------------------------------------------------------------------
