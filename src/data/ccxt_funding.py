@@ -9,7 +9,7 @@ def fetch_and_process_funding_rates(
     raw_dir: str = 'data/raw',
 ) -> pd.DataFrame:
   """Fetches historical funding rates via CCXT and aggregates to daily metrics."""
-  exchange = ccxt.binanceusdm({'enableRateLimit': True})
+  exchange = ccxt.bybit({'enableRateLimit': True})
   since = exchange.parse8601(f'{start_date_str}T00:00:00Z')
   now_ms = exchange.milliseconds()
 
