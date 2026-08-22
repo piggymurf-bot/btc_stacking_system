@@ -21,7 +21,7 @@ def fetch_and_process_funding_rates(
 
   # Generate monthly date range up to the current month
   start_dt = pd.to_datetime(start_date_str)
-  end_dt = pd.Timestamp.now(tz='UTC')
+  end_dt = pd.Timestamp.now().floor('D')
   date_range = pd.date_range(start=start_dt, end=end_dt, freq='MS')
 
   all_dfs = []
