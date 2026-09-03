@@ -89,7 +89,7 @@ The raw probability predictions are translated into the portfolio allocation via
 
 The meta-learner predictions are smoothed via an Exponential Moving Average to prevent signal noise:
 
-$$\bar{P}_t = \text{EMA}(P(y=1)_t, \text{span}=2)$$
+$\bar{P}_t = \text{EMA}(P(y=1)_t, \text{span}=2)$
 
 If $\bar{P}_t \ge \text{`Minimum signal probability floor`}$ ($0.55$ in the backtest), target allocation scales linearly up to $1.0$ (100% BTC), depending on the `Position scaling multiplier` ($2.50$ in the backtest):
 
@@ -103,7 +103,7 @@ The safeguard against entering during the blow-off tops. If $\text{RSI}_{14, t} 
 
 A continuous trailing stop loss tracks peak close prices for active positions since entry: 
 
-$$\text{Stop Price}_t = \text{Peak Price}_t - (\text{`ATR Multiplier`} \times \text{ATR}_{14, t-1})$$
+$\text{Stop Price}_t = \text{Peak Price}_t - (\text{`ATR Multiplier`} \times \text{ATR}_{14, t-1})$
 
 If $\text{Close}_t \le \text{Stop Price}_t$, the position is completely liquidated to cash (`ATR Multiplier` = 1.0 in the backtest).
 
