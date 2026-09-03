@@ -103,7 +103,7 @@ The safeguard against entering during the blow-off tops. If $$\text{RSI}_{14, t}
 
 A continuous trailing stop loss tracks peak close prices for active positions since entry: 
 
-$$\text{Stop Price}_t = \text{Peak Price}_t - ($$ `ATR Multiplier` $$\times \text{ATR}_{14, t-1})$$
+$\text{Stop Price}_t = \text{Peak Price}_t - ($ `ATR Multiplier` $$\times \text{ATR}_{14, t-1})$$
 
 If $\text{Close}_t \le \text{Stop Price}_t$, the position is completely liquidated to cash (`ATR Multiplier` = 1.0 in the backtest).
 
