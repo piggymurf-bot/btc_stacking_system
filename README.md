@@ -166,7 +166,7 @@ python main.py --backtest
 ```
 
 Interactive Streamlit Dashboard
-The dashboard can be used to explore equity curves, parameter grid-search plateaus, and performance metrics:
+* The dashboard can be used to explore equity curves, parameter grid-search plateaus, and performance metrics:
 
 ```bash
 streamlit run app.py
