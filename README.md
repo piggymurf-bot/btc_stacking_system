@@ -91,19 +91,19 @@ The meta-learner predictions are smoothed via an Exponential Moving Average to p
 
 $$\bar{P}_t = \text{EMA}(P(y=1)_t, \text{span}=2)$$
 
-If $\bar{P}_t \ge $ \text{`Minimum signal probability floor`} ($0.55$ in the backtest), target allocation scales linearly up to $1.0$ (100% BTC), depending on the `Position scaling multiplier` ($2.50$ in the backtest):
+If $$\bar{P}_t \ge $$ `Minimum signal probability floor` ($0.55$ in the backtest), target allocation scales linearly up to $1.0$ (100% BTC), depending on the `Position scaling multiplier` ($2.50$ in the backtest):
 
 $$\text{Target Allocation}_t = \min\left(1.0, \max\left(0.0, 2.50 \times (\bar{P}_t - 0.55)\right)\right)$$
 
 2. **Overbought Momentum Gate (RSI Filter)**
 
-The safeguard against entering during the blow-off tops. If $\text{RSI}_{14, t} > \text{`RSI cutoff`}$ ($75.0$ in the backtest), the target allocation is forced to 0.0% (All cash). 
+The safeguard against entering during the blow-off tops. If $$\text{RSI}_{14, t} > $$ `RSI cutoff` ($75.0$ in the backtest), the target allocation is forced to 0.0% (All cash). 
 
 3. **Dynamic ATR Trailing Stop**
 
 A continuous trailing stop loss tracks peak close prices for active positions since entry: 
 
-$\text{Stop Price}_t = \text{Peak Price}_t - (\text{`ATR Multiplier`} \times \text{ATR}_{14, t-1})$
+$$\text{Stop Price}_t = \text{Peak Price}_t - ($$ `ATR Multiplier`$$\times \text{ATR}_{14, t-1})$$
 
 If $\text{Close}_t \le \text{Stop Price}_t$, the position is completely liquidated to cash (`ATR Multiplier` = 1.0 in the backtest).
 
