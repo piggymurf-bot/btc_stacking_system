@@ -291,6 +291,104 @@ class VectorizedBacktester:
     plt.savefig(save_path, dpi=300)
     plt.close()
     print(f"Equity curve plot saved to {save_path}")
+    
+  def compute_performance_metrics_btc(self) -> dict:
+    """Computes institutional risk-adjusted performance indicators."""
+    if self.results_df is None:
+        raise ValueError("Run backtest before computing metrics.")
+
+    df = self.results_df.copy()
+    net_ret = df["strategy_net_return"]
+    asset_ret = df["asset_return"]
+
+    # 1. Standard Returns & Sharpe Ratio
+    std_ret = net_ret.std()
+    sharpe = np.sqrt(365) * (net_ret.mean() / std_ret) if std_ret != 0 else 0.0
+
+    # 2. Downside Risk & Sortino Ratio
+    downside_returns = net_ret[net_ret < 0.0]
+    downside_std = downside_returns.std()
+    sortino = (
+        np.sqrt(365) * (net_ret.mean() / downside_std)
+        if downside_std != 0 and not np.isnan(downside_std)
+        else 0.0
+    )
+
+    # 3. Drawdown & Calmar Ratio
+    cum_eq = df["equity_strategy"]
+    peak = cum_eq.cummax()
+    drawdown = (cum_eq - peak) / peak
+    max_drawdown = abs(drawdown.min())  # Positive float for ratios
+
+    total_strat_return = (cum_eq.iloc[-1] / self.initial_capital) - 1.0
+    total_bench_return = (
+        df["equity_benchmark"].iloc[-1] / self.initial_capital
+    ) - 1.0
+
+    # Compute Annualized Return for Calmar Calculation
+    n_days = max(1, len(df))
+    annualized_return = (1.0 + total_strat_return) ** (365.0 / n_days) - 1.0
+    calmar = (
+        annualized_return / max_drawdown
+        if max_drawdown > 0
+        else annualized_return
+    )
+
+    # 4. Win Rate, Profit Factor, and Expectancy
+    # A "Trade" occurs when position > 0 OR when a trade rebalance/entry/exit occurred
+    active_mask = (df["position"] > 0.0) | (df["trades"] > 0.0)
+    active_days = df[active_mask]
+    
+    winning_days = active_days[active_days["strategy_net_return"] > 0.0]["strategy_net_return"]
+    losing_days = active_days[active_days["strategy_net_return"] < 0.0]["strategy_net_return"]
+
+    win_count = len(winning_days)
+    loss_count = len(losing_days)
+    total_active_days = win_count + loss_count
+
+    win_rate = (win_count / total_active_days) if total_active_days > 0 else 0.0
+
+    gross_profit = winning_days.sum()
+    gross_loss = abs(losing_days.sum())
+    profit_factor = (
+        (gross_profit / gross_loss) if gross_loss > 0 else np.nan
+    )
+
+    avg_win = winning_days.mean() if win_count > 0 else 0.0
+    avg_loss = abs(losing_days.mean()) if loss_count > 0 else 0.0
+    
+    # Expectancy ($ expected per active trading day)
+    expectancy_usd = (win_rate * avg_win - (1.0 - win_rate) * avg_loss) * self.initial_capital
+
+    # 5. Crypto Alpha & Beta vs. BTC
+    cov_matrix = np.cov(net_ret, asset_ret)
+    btc_var = np.var(asset_ret)
+    beta = cov_matrix[0, 1] / btc_var if btc_var != 0 else 1.0
+    
+    # Alpha (Annualized excess return adjusted for beta)
+    bench_annualized = (1.0 + total_bench_return) ** (365.0 / n_days) - 1.0
+    alpha = annualized_return - (beta * bench_annualized)
+
+    total_turnover = df["trades"].sum()
+
+    return {
+        # Core Metrics
+        "Total Return Strategy (%)": round(total_strat_return * 100, 2),
+        "Total Return BTC Benchmark (%)": round(total_bench_return * 100, 2),
+        "Annualized Alpha (%)": round(alpha * 100, 2),
+        "Beta vs BTC": round(beta, 2),
+        # Risk-Adjusted Return Metrics
+        "Annualized Sharpe Ratio": round(sharpe, 2),
+        "Annualized Sortino Ratio": round(sortino, 2),
+        "Calmar Ratio": round(calmar, 2),
+        "Max Drawdown (%)": round(-max_drawdown * 100, 2),
+        # Trade Analysis Metrics
+        "Win Rate (%)": round(win_rate * 100, 2),
+        "Profit Factor": round(profit_factor, 2) if not np.isnan(profit_factor) else "Inf",
+        "Daily Expectancy ($)": round(expectancy_usd, 2),
+        "Total Active Trading Days": total_active_days,
+        "Total Portfolio Turnover (x)": round(total_turnover, 2),
+    }
 
 
 def run_backtest_pipeline(long_threshold: float = 0.60):
@@ -308,18 +406,41 @@ def run_backtest_pipeline(long_threshold: float = 0.60):
   #)
   
   # Aggressive / Less Defensive Configuration
+  #tester.run_backtest(
+  #    sizing_mode="dynamic",
+  #    min_probability=0.51,  # Lower entry floor (was 0.55)
+  #    max_position_scale=3.5,  # Faster scaling to 1.0 position size (was 2.5)
+  #    rsi_max_filter=72.0,  # Allow holding during strong momentum (was 65.0)
+  #    atr_multiplier=1.5,  # Wider stop to survive standard BTC volatility (was 0.8)
+  #    smooth_window=2,  # Keep fast reactivity
+  #    min_rebalance_delta=0.04,
+  #)
+  
+  #Stabilized Configuration according to the Grid search
   tester.run_backtest(
       sizing_mode="dynamic",
-      min_probability=0.51,  # Lower entry floor (was 0.55)
-      max_position_scale=3.5,  # Faster scaling to 1.0 position size (was 2.5)
-      rsi_max_filter=72.0,  # Allow holding during strong momentum (was 65.0)
-      atr_multiplier=1.5,  # Wider stop to survive standard BTC volatility (was 0.8)
-      smooth_window=2,  # Keep fast reactivity
+      min_probability=0.55,  
+      max_position_scale=3.0,  
+      rsi_max_filter=75.0,  
+      atr_multiplier=1.0,  
+      smooth_window=2,  
       min_rebalance_delta=0.04,
   )
   
-  metrics = tester.compute_performance_metrics()
-
+  # Simulate pure Buy & Hold using the dynamic backtest engine
+  #tester.run_backtest(
+  #    sizing_mode="dynamic",
+  #    min_probability=0.00,  # Always eligible to hold
+  #    max_position_scale=100.0,  # Scaled to 100% position immediately
+  #    rsi_max_filter=100.0,  # Never exit on overbought RSI
+  #    atr_multiplier=999.0,  # Extremely wide stop (never triggers)
+  #    smooth_window=1,
+  #    min_rebalance_delta=0.04,
+  #)
+  
+  #metrics = tester.compute_performance_metrics()
+  metrics = tester.compute_performance_metrics_btc()
+  
   print("\n--- Strategy Performance Results ---")
   for key, value in metrics.items():
     print(f"{key:32s}: {value}")

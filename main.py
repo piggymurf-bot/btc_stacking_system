@@ -78,7 +78,8 @@ def main():
     run_training_pipeline()
    
   if args.backtest:
-    print(f"Executing Backtesting Engine (Threshold: {args.threshold})...")
+    print('--> Executing Backtesting Engine...')  
+    #print(f"Executing Backtesting Engine (Threshold: {args.threshold})...")
     # args.threshold is passed directly here into the engine
     run_backtest_pipeline(long_threshold=args.threshold)
   

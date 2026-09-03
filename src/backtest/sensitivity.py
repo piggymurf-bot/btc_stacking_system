@@ -9,94 +9,104 @@ from src.backtest.engine import VectorizedBacktester
 
 class SensitivityAnalyzer:
 
-  def __init__(
-      self, preds_path="data/processed/holdout_predictions.csv"
-  ):
-    self.preds_path = preds_path
-    if not os.path.exists(self.preds_path):
-      raise FileNotFoundError(f"Predictions file not found at: {self.preds_path}")
-    self.tester = VectorizedBacktester(predictions_path=self.preds_path)
+    def __init__(self, preds_path="data/processed/holdout_predictions.csv"):
+        self.preds_path = preds_path
+        if not os.path.exists(self.preds_path):
+            raise FileNotFoundError(f"Predictions file not found at: {self.preds_path}")
+        self.tester = VectorizedBacktester(predictions_path=self.preds_path)
 
-  def run_2d_grid(
-      self,
-      scale_range=np.linspace(1.5, 5.0, 8),
-      atr_range=np.linspace(0.5, 2.5, 9),
-      fixed_min_prob=0.53,
-      fixed_rsi_cap=70.0,
-      metric="Annualized Sharpe Ratio",
-  ):
-    """Sweeps two key parameters across a grid and computes performance metrics."""
-    results = []
+    def run_2d_grid(
+        self,
+        param_x="atr_multiplier",
+        x_range=np.linspace(0.5, 2.5, 9),
+        param_y="max_position_scale",
+        y_range=np.linspace(1.5, 5.0, 8),
+        fixed_params=None,
+        metric="Annualized Sharpe Ratio",
+    ):
+        """Sweeps any two dynamic parameters across a grid and computes performance metrics."""
+        
+        # Default fixed baseline values for parameters not being swept
+        base_kwargs = {
+            "min_probability": 0.53,
+            "max_position_scale": 3.0,
+            "rsi_max_filter": 70.0,
+            "atr_multiplier": 1.0,
+            "smooth_window": 2,
+            "min_rebalance_delta": 0.04,
+            "sizing_mode": "dynamic",
+        }
+        
+        if fixed_params:
+            base_kwargs.update(fixed_params)
 
-    print(
-        f"🔍 Sweeping Grid: {len(scale_range)} Scale levels × {len(atr_range)} ATR levels..."
-    )
+        results = []
 
-    for scale in scale_range:
-      for atr in atr_range:
-        self.tester.run_backtest(
-            sizing_mode="dynamic",
-            min_probability=fixed_min_prob,
-            max_position_scale=float(scale),
-            rsi_max_filter=fixed_rsi_cap,
-            atr_multiplier=float(atr),
-            smooth_window=2,
-            min_rebalance_delta=0.04,
+        print(f"🔍 Sweeping Grid: {param_x} ({len(x_range)}) × {param_y} ({len(y_range)})...")
+
+        for val_y in y_range:
+            for val_x in x_range:
+                # Copy baseline settings and assign the current grid values
+                run_kwargs = base_kwargs.copy()
+                run_kwargs[param_x] = float(val_x)
+                run_kwargs[param_y] = float(val_y)
+
+                self.tester.run_backtest(**run_kwargs)
+                metrics = self.tester.compute_performance_metrics()
+
+                results.append({
+                    param_y: round(float(val_y), 2),
+                    param_x: round(float(val_x), 2),
+                    metric: metrics.get(metric, 0.0),
+                    "Max Drawdown (%)": metrics.get("Max Drawdown (%)", 0.0),
+                    "Total Return (%)": metrics.get("Total Return Strategy (%)", 0.0),
+                })
+
+        df_results = pd.DataFrame(results)
+
+        # Pivot table for Plotly / Seaborn heatmap rendering
+        pivot_metric = df_results.pivot(
+            index=param_y, columns=param_x, values=metric
         )
-        metrics = self.tester.compute_performance_metrics()
-        results.append({
-            "Position Scale": round(float(scale), 2),
-            "ATR Multiplier": round(float(atr), 2),
-            metric: metrics.get(metric, 0.0),
-            "Max Drawdown (%)": metrics.get("Max Drawdown (%)", 0.0),
-            "Total Return (%)": metrics.get("Total Return Strategy (%)", 0.0),
-        })
 
-    df_results = pd.DataFrame(results)
-
-    # Pivot table for the selected metric
-    pivot_metric = df_results.pivot(
-        index="Position Scale", columns="ATR Multiplier", values=metric
-    )
-
-    return df_results, pivot_metric
-
-  def plot_heatmap(
-      self,
-      pivot_table,
-      metric_name="Annualized Sharpe Ratio",
-      save_path=None,
-  ):
-    """Generates and displays a heatmap of the parameter grid."""
-    plt.figure(figsize=(11, 7))
-    sns.set_theme(style="white")
-
-    ax = sns.heatmap(
+        return df_results, pivot_metric
+  
+    def plot_heatmap(
+        self,
         pivot_table,
-        annot=True,
-        fmt=".2f",
-        cmap="viridis",
-        cbar_kws={"label": metric_name},
-        linewidths=0.5,
-    )
+        metric_name="Annualized Sharpe Ratio",
+        save_path=None,
+    ):
+        """Generates and displays a heatmap of the parameter grid."""
+        plt.figure(figsize=(11, 7))
+        sns.set_theme(style="white")
 
-    plt.title(
-        f"Parameter Stability Plateau: {metric_name}",
-        fontsize=14,
-        pad=15,
-        weight="bold",
-    )
-    plt.xlabel("ATR Trailing Stop Multiplier", fontsize=11, labelpad=10)
-    plt.ylabel("Position Scaling Multiplier", fontsize=11, labelpad=10)
-    plt.gca().invert_yaxis()  # Standard axis orientation
+        ax = sns.heatmap(
+            pivot_table,
+            annot=True,
+            fmt=".2f",
+            cmap="viridis",
+            cbar_kws={"label": metric_name},
+            linewidths=0.5,
+            )
 
-    plt.tight_layout()
+        plt.title(
+            f"Parameter Stability Plateau: {metric_name}",
+            fontsize=14,
+            pad=15,
+            weight="bold",
+            )
+        plt.xlabel("ATR Trailing Stop Multiplier", fontsize=11, labelpad=10)
+        plt.ylabel("Position Scaling Multiplier", fontsize=11, labelpad=10)
+        plt.gca().invert_yaxis()  # Standard axis orientation
+        
+        plt.tight_layout()
+        
+        if save_path:
+            plt.savefig(save_path, dpi=300)
+            print(f"📊 Heatmap saved to {save_path}")
 
-    if save_path:
-      plt.savefig(save_path, dpi=300)
-      print(f"📊 Heatmap saved to {save_path}")
-
-    plt.show()
+        plt.show()
 
 
 # -----------------------------------------------------------------------------

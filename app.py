@@ -53,6 +53,7 @@ preset = st.sidebar.radio(
     options=[
         "🛡️ Defensive (Capital Preservation)",
         "🚀 Aggressive (Upside Capture)",
+        "🕹️ Stabilize (Based on Grid search)",
         "⚙️ Custom Configuration",
     ],
     index=0,
@@ -72,6 +73,11 @@ elif "Aggressive" in preset:
   default_scale = 3.5
   default_rsi = 72.0
   default_atr = 1.5
+elif "Stabilize" in preset:
+ default_min_prob = 0.55
+ default_scale = 3.0
+ default_rsi = 75.0
+ default_atr = 1.00 
 else:
   default_min_prob = 0.53
   default_scale = 3.0
@@ -137,10 +143,11 @@ def load_and_run_backtest(
       min_rebalance_delta=0.04,
   )
   metrics = tester.compute_performance_metrics()
-  return df_res, metrics
+  metrics_btc = tester.compute_performance_metrics_btc()
+  return df_res, metrics, metrics_btc
 
 
-df_results, metrics = load_and_run_backtest(
+df_results, metrics, metrics_btc = load_and_run_backtest(
     min_prob, max_scale, rsi_filter, atr_mult
 )
 
@@ -176,7 +183,9 @@ st.markdown("---")
 # SECTION 2: INTERACTIVE CHARTS
 # -----------------------------------------------------------------------------
 
-tab1, tab2 = st.tabs(["📈 Dynamic Backtest UI", "🗺️ Parameter Plateau Detector"])
+tab1, tab2, tab3 = st.tabs(["📈 Dynamic Backtest UI", 
+                            "🗺️ Parameter Plateau Detector",
+                            "📊 Performance Metrics"])
 
 with tab1:
   st.subheader("📊 Interactive Equity Curve & Allocation Dynamics")
@@ -237,62 +246,141 @@ with tab1:
   st.plotly_chart(fig, use_container_width=True)
 
 with tab2:
-  st.subheader("Interactive 2D Parameter Surface")
-  
-  col_x, col_y = st.columns(2)
-  with col_x:
-    param_x = st.selectbox(
-        "X-Axis Parameter (Columns)",
-        options=["atr_multiplier", "rsi_max_filter", "max_position_scale"],
-        index=0  # Default: ATR
-    )
-  with col_y:
-    param_y = st.selectbox(
-        "Y-Axis Parameter (Rows)",
-        options=["min_probability", "max_position_scale", "rsi_max_filter"],
-        index=0  # Default: min_probability
-    )
+    st.subheader("Interactive 2D Parameter Surface")
+    
+    PARAM_MAP = {
+        "ATR Multiplier": ("atr_multiplier", np.linspace(0.5, 2.5, 9)),
+        "Minimum Probability Floor": ("min_probability", np.linspace(0.50, 0.65, 7)),
+        "Position Scaling Multiplier": ("max_position_scale", np.linspace(1.5, 5.0, 8)),
+        "RSI Overbought Gate": ("rsi_max_filter", np.linspace(60.0, 85.0, 6)),
+    }
 
-  if st.button("🚀 Run 2D Sensitivity Grid Sweep"):
-    from src.backtest.sensitivity import SensitivityAnalyzer
-    import plotly.express as px
+    col_x, col_y = st.columns(2)
+    with col_x:
+        label_x = st.selectbox(
+            "X-Axis Parameter (Columns)",
+            options=list(PARAM_MAP.keys()),
+            index=0  # Default: ATR
+        )
+    with col_y:
+        label_y = st.selectbox(
+            "Y-Axis Parameter (Rows)",
+            options=list(PARAM_MAP.keys()),
+            index=2  # Default: Position Scaling
+        )
 
-    with st.spinner("Sweeping parameter combinations..."):
-      analyzer = SensitivityAnalyzer()
-      _, pivot_sharpe = analyzer.run_2d_grid(
-          scale_range=np.linspace(1.5, 5.0, 8),
-          atr_range=np.linspace(0.5, 2.5, 9),
-          metric="Annualized Sharpe Ratio",
-      )
+    if label_x == label_y:
+        st.warning("⚠️ Please select two different parameters for X and Y axes.")
+    else:
+        if st.button("🚀 Run 2D Sensitivity Grid Sweep"):
+            from src.backtest.sensitivity import SensitivityAnalyzer
+            import plotly.express as px
 
-      # Render Interactive Plotly Heatmap with clear labels
-      fig_heatmap = px.imshow(
-          pivot_sharpe,
-          labels=dict(
-              x="ATR Trailing Stop Multiplier (Stop Loss Distance)",
-              y="Position Scaling Multiplier (Aggressiveness)",
-              color="Sharpe Ratio",
-          ),
-          x=[f"{col:.2f}" for col in pivot_sharpe.columns],
-          y=[f"{idx:.2f}" for idx in pivot_sharpe.index],
-          color_continuous_scale="Viridis",
-          aspect="auto",
-          text_auto=".2f",  # Displays values inside cells
-      )
+            param_x_key, x_range = PARAM_MAP[label_x]
+            param_y_key, y_range = PARAM_MAP[label_y]
 
-      fig_heatmap.update_layout(
-          title="<b>Annualized Sharpe Ratio Plateau</b>",
-          template="plotly_dark",
-          height=500,
-          xaxis_title="<b>ATR Trailing Stop Multiplier</b>",
-          yaxis_title="<b>Position Scaling Multiplier</b>",
-      )
+            # Pass current sidebar slider settings as fixed baseline values
+            fixed_defaults = {
+                "min_probability": min_prob,
+                "max_position_scale": max_scale,
+                "rsi_max_filter": rsi_filter,
+                "atr_multiplier": atr_mult,
+            }
 
-      # Force Y-axis orientation so 1.5 is at bottom, 5.0 is at top
-      fig_heatmap.update_yaxes(autorange="reversed")
+            with st.spinner(f"Sweeping {label_x} vs {label_y}..."):
+                analyzer = SensitivityAnalyzer()
+                _, pivot_sharpe = analyzer.run_2d_grid(
+                    param_x=param_x_key,
+                    x_range=x_range,
+                    param_y=param_y_key,
+                    y_range=y_range,
+                    fixed_params=fixed_defaults,
+                    metric="Annualized Sharpe Ratio",
+                )
 
-      st.plotly_chart(fig_heatmap, use_container_width=True)
+                # Render Interactive Plotly Heatmap
+                fig_heatmap = px.imshow(
+                    pivot_sharpe,
+                    labels=dict(
+                        x=label_x,
+                        y=label_y,
+                        color="Sharpe Ratio",
+                    ),
+                    x=[f"{col:.2f}" for col in pivot_sharpe.columns],
+                    y=[f"{idx:.2f}" for idx in pivot_sharpe.index],
+                    color_continuous_scale="Viridis",
+                    aspect="auto",
+                    text_auto=".2f",
+                )
 
+                fig_heatmap.update_layout(
+                    title=f"<b>Annualized Sharpe Ratio Plateau ({label_x} vs {label_y})</b>",
+                    template="plotly_dark",
+                    height=500,
+                    xaxis_title=f"<b>{label_x}</b>",
+                    yaxis_title=f"<b>{label_y}</b>",
+                )
+
+                fig_heatmap.update_yaxes(autorange="reversed")
+                st.plotly_chart(fig_heatmap, use_container_width=True)
+
+with tab3:
+    st.subheader("Strategy Performance")
+        
+    data = {
+    "Category": ["Core Metrics", " ", " ", " ", 
+                 "Risk-Adjusted Return", " ", " ", " ",
+                 "Trade Analysis", " ", " ", " ", " "],
+    "Metric": ["Total Return Strategy (%)", 
+               "Total Return BTC Benchmark (%)", 
+               "Annualized Alpha (%)", 
+               "Beta vs BTC",
+               "Annualized Sharpe Ratio", 
+               "Annualized Sortino Ratio", 
+               "Calmar Ratio", 
+               "Max Drawdown (%)",
+               "Win Rate (%)", 
+               "Profit Factor", 
+               "Daily Expectancy ($)", 
+               "Total Active Trading Days", 
+               "Total Portfolio Turnover (x)"
+               ],
+    "Value": [ metrics_btc["Total Return Strategy (%)"], 
+               metrics_btc["Total Return BTC Benchmark (%)"], 
+               metrics_btc["Annualized Alpha (%)"], 
+               metrics_btc["Beta vs BTC"],
+               metrics_btc["Annualized Sharpe Ratio"], 
+               metrics_btc["Annualized Sortino Ratio"], 
+               metrics_btc["Calmar Ratio"], 
+               metrics_btc["Max Drawdown (%)"],
+               metrics_btc["Win Rate (%)"], 
+               metrics_btc["Profit Factor"], 
+               metrics_btc["Daily Expectancy ($)"], 
+               metrics_btc["Total Active Trading Days"], 
+               metrics_btc["Total Portfolio Turnover (x)"] 
+               ],
+    "Target": ["> BTC Benchmark", "Baseline", "> 0.00", "< 0.70", 
+               "> 1.20", "> 1.50", "> 2.00", "> -20.0% ",
+               "35% - 55%", "> 1.50", "> $0,00", "> 200 Days", "Monitor Drag" 
+               ],
+    }
+
+    df = pd.DataFrame(data)
+
+    #st.title("Performance Metrics Dashboard")
+
+    # Display as an interactive dataframe
+    st.dataframe(
+        df,
+        hide_index=True,  # Hides the pandas row index (0, 1, 2...)
+        use_container_width=True,  # Expands to fill the container width
+        column_config={
+            "Value": st.column_config.NumberColumn(
+                "Calculated Value",
+                format="%.2f",  # Formats numbers to 2 decimal places
+                ),
+            },
+        )
 
 # -----------------------------------------------------------------------------
 # SECTION 3: STRATEGY DIAGNOSTICS & DATA TABLE
