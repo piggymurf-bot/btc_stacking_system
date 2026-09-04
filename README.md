@@ -125,7 +125,7 @@ If $\text{Close}_t \le \text{Stop Price}_t$, the position is completely liquidat
 
 ```bash
 # Clone repository
-git clone [https://github.com/your-username/btc_stacking_system.git](https://github.com/your-username/btc_stacking_system.git)
+git clone https://github.com/piggymurf-bot/btc_stacking_system.git
 cd btc_stacking_system
 
 # Create and activate environment
