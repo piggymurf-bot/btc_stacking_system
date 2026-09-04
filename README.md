@@ -57,7 +57,7 @@ btc_stacking_system/
 │   └── paper_trade.yml             # Automated daily execution pipeline
 ├── app.py			                    # Interactive dashboard
 ├── paper_trade.py				  	      # Forward testing script
-├── main.py                              # Unified CLI pipeline orchestrator
+├── main.py                         # Unified CLI pipeline orchestrator
 ├── requirements.txt                # Project dependencies
 └── README.md                       # System documentation
 ```
