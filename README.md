@@ -33,7 +33,7 @@ btc_stacking_system/
 ├── data/
 │   ├── raw/                        # Ingested datasets (BGeometrics, Binance, Yahoo Finance)
 │   ├── processed/                  # Master feature matrix, holdout predictions, Equity Curve of backtesting
-│   └── paper_trading.db		  	 # SQLite database tracking forward paper trades
+│   └── paper_trading.db		  	    # SQLite database tracking forward paper trades
 ├── models/
 │   └── stacking_ensemble.pkl       # Serialized trained stacking meta-learner
 ├── src/
@@ -55,8 +55,9 @@ btc_stacking_system/
 │       └── engine.py               # Backtesting with Vectorized simulator (Dynamic Sizing + ATR/RSI Gates)
 ├── .github/workflows/
 │   └── paper_trade.yml             # Automated daily execution pipeline
-├── app.py			                 # Interactive dashboard
-├── paper_trade.py				  	 # Forward testing script 
+├── app.py			                    # Interactive dashboard
+├── paper_trade.py				  	      # Forward testing script
+├── main.py                              # Unified CLI pipeline orchestrator
 ├── requirements.txt                # Project dependencies
 └── README.md                       # System documentation
 ```
