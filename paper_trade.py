@@ -49,11 +49,19 @@ SYMBOL = "BTCUSDT"
 TIMEFRAME = "1d"
 INITIAL_CAPITAL = 10000.0  # $10,000 Starting paper capital
 
-# Strategy Parameters (From your optimal stability plateau)
-MIN_PROBABILITY = 0.53
-MAX_POSITION_SCALE = 3.5
-RSI_MAX_FILTER = 72.0
-ATR_MULTIPLIER = 1.25
+# Strategy Parameters (Aggressive Preset)
+#MIN_PROBABILITY = 0.53
+#MAX_POSITION_SCALE = 3.5
+#RSI_MAX_FILTER = 72.0
+#ATR_MULTIPLIER = 1.25
+
+# Strategy Parameters (Stabilized Preset)
+MIN_PROBABILITY = 0.55
+MAX_POSITION_SCALE = 3.0
+RSI_MAX_FILTER = 75.0
+ATR_MULTIPLIER = 1.0
+
+
 
 # Directories for files
 raw_dir: str = 'data/raw' 
