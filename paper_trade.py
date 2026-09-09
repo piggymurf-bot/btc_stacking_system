@@ -258,7 +258,7 @@ def generate_live_signal(df_market):
     """Processes daily data through the Meta-Learner model."""
     
     # Extract latest features
-    latest_features = df_market.iloc[[-1]]
+    #latest_features = df_market.iloc[[-1]]
 
     # Load trained model weights
     if not os.path.exists(MODEL_PATH):
@@ -266,10 +266,18 @@ def generate_live_signal(df_market):
     
     model = joblib.load(MODEL_PATH)
     
-    print("⚙️ Feeding data to the meta-learner...")
-
-    # Predict probability for today's close
-    prob = float(model.predict_proba_stack(latest_features)[:, 1][0])
+    # Extract last 10 days features
+    recent_features = df_market.tail(10)
+    
+    raw_probs = model.predict_proba_stack(recent_features)[:, 1]
+    
+    # Apply EMA smoothing matching your backtest engine
+    ema_span = 2.0    
+    prob_series = pd.Series(raw_probs)
+    smoothed_probs = prob_series.ewm(span=ema_span, adjust=False).mean()
+    
+    # The live probability for today is the last smoothed value
+    prob = float(smoothed_probs.iloc[-1])
 
     # Compute target position size using strategy rules
     if prob < MIN_PROBABILITY:
@@ -327,11 +335,13 @@ def execute_paper_trade():
     print(f"Current Portfolio : Cash=${current_cash:,.2f} | BTC={current_btc:.4f} (${current_btc_usd:,.2f})")
     print(f"Total Equity      : ${total_equity:,.2f}")
 
-    # Minimum trade threshold to avoid tiny micro-rebalances ($20 min trade)
-    MIN_TRADE_USD = 20.0
+    # HYSTERESIS / REBALANCE THRESHOLD
+    # Require at least a 10% shift in portfolio allocation to justify trading
+    REBALANCE_THRESHOLD_PCT = 0.10  # 10% shift
+    MIN_TRADE_USD = total_equity * REBALANCE_THRESHOLD_PCT
 
     if abs(delta_usd) < MIN_TRADE_USD:
-        print("✅ Portfolio already aligned with target position. No rebalance needed.")
+        print(f"✅ Rebalance delta (${abs(delta_usd):,.2f}) below threshold (${MIN_TRADE_USD:,.2f}). Holding position.")
         update_portfolio_state(current_cash, current_btc, current_price)
         return
 
