@@ -32,6 +32,11 @@ def json_url_to_csv(
   response.raise_for_status()
 
   json_data = response.json()
+  
+  # Check if response is an error object from the API
+  if isinstance(json_data, dict) and ('message' in json_data or 'error' in json_data):
+      raise ValueError(f"API Error Response: {json_data}")
+
   df = (
       pd.json_normalize(json_data)
       if isinstance(json_data, dict)
@@ -55,7 +60,7 @@ def fetch_and_merge_bgeometrics(
     try:
       df = json_url_to_csv(query_url, output_csv_path=out_path)
 
-      # Standardize column names
+      # Standardize column names safely
       df.columns = df.columns.astype(str).str.lower()
       if 'unixts' in df.columns:
         df = df.drop(columns=['unixts'])
@@ -66,14 +71,19 @@ def fetch_and_merge_bgeometrics(
         df = df.drop(columns=['d'])
         df.insert(0, 'date', df.pop('date'))
 
-      dfs.append(df)
+      # CRITICAL: Only include DataFrames that actually have the 'date' column
+      if 'date' in df.columns:
+        dfs.append(df)
+      else:
+        print(f'⚠️ Warning: {name} skipped because it lacks a valid "d" (date) column.')
+
     except Exception as e:
-      print(f'Error fetching {name}: {e}')
+      print(f'❌ Error fetching {name}: {e}')
 
   if not dfs:
-    raise ValueError('No valid dataframes retrieved from BGeometrics.')
+    raise ValueError('No valid dataframes with "date" column retrieved from BGeometrics.')
 
-  # Merge all dataframes on date
+  # Merge all valid dataframes on date
   merged_matrix = reduce(
       lambda left, right: pd.merge(left, right, on='date', how='outer'), dfs
   )
