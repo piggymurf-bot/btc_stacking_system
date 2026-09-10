@@ -56,7 +56,7 @@ def fetch_and_merge_bgeometrics(
       df = json_url_to_csv(query_url, output_csv_path=out_path)
 
       # Standardize column names
-      df.columns = df.columns.str.lower()
+      df.columns = df.columns.astype(str).str.lower()
       if 'unixts' in df.columns:
         df = df.drop(columns=['unixts'])
 
