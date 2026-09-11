@@ -1,7 +1,10 @@
-from functools import reduce
 import os
 import pandas as pd
 import requests
+from functools import reduce
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
 
 URLS = [
     'https://api.bgeometrics.com/v1/aviv',
@@ -23,27 +26,36 @@ CSV_NAMES = [
     'technical-indicators.csv',
 ]
 
-
 def json_url_to_csv(
     url: str, output_csv_path: str, headers: dict = None
 ) -> pd.DataFrame:
-  """Fetches JSON data from a URL, normalizes it, and saves it locally."""
-  response = requests.get(url, headers=headers, timeout=15)
-  response.raise_for_status()
+    """Fetches JSON data with automatic retry logic for transient network issues."""
+    session = requests.Session()
+    
+    # Retry up to 3 times on transient gateway/network errors with backoff (2s, 4s, 8s)
+    retries = Retry(
+        total=3,
+        backoff_factor=2,
+        status_forcelist=[429, 500, 502, 503, 504]
+    )
+    session.mount('https://', HTTPAdapter(max_retries=retries))
+    
+    response = session.get(url, headers=headers, timeout=15)
+    response.raise_for_status()
 
-  json_data = response.json()
-  
-  # Check if response is an error object from the API
-  if isinstance(json_data, dict) and ('message' in json_data or 'error' in json_data):
-      raise ValueError(f"API Error Response: {json_data}")
+    json_data = response.json()
+    
+    # Check if response is an API error object
+    if isinstance(json_data, dict) and ('message' in json_data or 'error' in json_data):
+        raise ValueError(f"API Error Response: {json_data}")
 
-  df = (
-      pd.json_normalize(json_data)
-      if isinstance(json_data, dict)
-      else pd.DataFrame(json_data)
-  )
-  df.to_csv(output_csv_path, index=False)
-  return df
+    df = (
+        pd.json_normalize(json_data)
+        if isinstance(json_data, dict)
+        else pd.DataFrame(json_data)
+    )
+    df.to_csv(output_csv_path, index=False)
+    return df
 
 
 def fetch_and_merge_bgeometrics(
