@@ -35,3 +35,7 @@ def run_full_data_pipeline(api_token: str, symbol: str = 'BTCUSDT'):
   )
 
   print('\n=== ALL DATA SOURCES SUCCESSFULLY DOWNLOADED & SAVED TO data/raw/ ===')
+  
+def run_full_data_pipeline_v2(api_token: str, symbol: str = 'BTCUSDT'):
+    """ Rework on data downloader """
+    # 

@@ -52,7 +52,7 @@ def find_optimal_d(
       continue
 
     # Run Augmented Dickey-Fuller stationarity test
-    p_val = adfuller(ffd_series, autolag='AIC')[1]
+    p_val = adfuller(ffd_series, autolag='AIC', result_object=True)[1]
 
     if p_val < p_thres:
       print(
