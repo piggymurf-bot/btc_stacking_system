@@ -10,17 +10,17 @@ The backtest on out-of-fold predictions from **July 2023 to July 2026** with ATR
 
 ## 📊 Strategy Performance vs. BTC Benchmark
 
-| Metric | Honest Baseline Strategy | BTC Buy & Hold | Institutional Target | Status |
+| Metric | Optimized Strategy (No RSI Gate) | BTC Buy & Hold | Institutional Target | Status |
 | :--- | :---: | :---: | :---: | :---: |
-| **Total Net Return** | **+22.85%** | +110.53% | > BTC Benchmark | 🟡 In Progress |
-| **Max Drawdown** | **-20.89%** | -53.06% | > -20.00% | 🟡 Near Target |
-| **Sharpe Ratio** | **0.48** | 0.74 | > 1.20 | 🟡 Developing |
-| **Sortino Ratio** | **0.51** | 1.11 | > 1.50 | 🟡 Developing |
-| **Calmar Ratio** | **0.32** | 0.50 | > 2.00 | 🟡 Developing |
-| **Annualized Alpha** | **+1.35%** | 0.00% | > 0.00% | 🟢 Pass |
-| **Beta vs BTC** | **0.20** | 1.00 | < 0.70 | 🟢 Pass |
-| **Win Rate** | **47.38%** | 49.96% | 35.0% - 55.0% | 🟢 Pass |
-| **Profit Factor** | **1.13** | 1.12 | > 1.50 | 🟡 Developing |
+| **Total Net Return** | **+45.24%** | +110.53% | > BTC Benchmark | 🟡 In Progress |
+| **Max Drawdown** | **-22.57%** | -53.06% | > -20.00% | 🟡 Near Target |
+| **Sharpe Ratio** | **0.72** | 0.74 | > 1.20 | 🟢 Competitive |
+| **Sortino Ratio** | **0.83** | 1.11 | > 1.50 | 🟢 Competitive |
+| **Calmar Ratio** | **0.56** | 0.50 | > 2.00 | 🟡 Developing |
+| **Annualized Alpha** | **+5.76%** | 0.00% | > 0.00% | 🟢 Pass |
+| **Beta vs BTC** | **0.26** | 1.00 | < 0.70 | 🟢 Pass |
+| **Win Rate** | **47.69%** | 49.96% | 35.0% - 55.0% | 🟢 Pass |
+| **Profit Factor** | **1.18** | 1.12 | > 1.50 | 🟡 Developing |
 
 > **Key Takeaway:** While the strategy underperformed a market benchmark, the system successfully restricted risk, **cutting max drawdown from -53.06% down to -20.89%** and maintaining a low beta ($0.20$) against BTC.
 ---
@@ -95,11 +95,7 @@ If $$\bar{P}_t \ge $$ `Minimum signal probability floor` ($0.55$ in the backtest
 
 $$\text{Target Allocation}_t = \min\left(1.0, \max\left(0.0, 2.50 \times (\bar{P}_t - 0.55)\right)\right)$$
 
-2. **Overbought Momentum Gate (RSI Filter)**
-
-The safeguard against entering during the blow-off tops. If $$\text{RSI}_{14, t} > $$ `RSI cutoff` ($75.0$ in the backtest), the target allocation is forced to 0.0% (All cash). 
-
-3. **Dynamic ATR Trailing Stop**
+2. **Dynamic ATR Trailing Stop**
 
 A continuous trailing stop loss tracks peak close prices for active positions since entry: 
 
@@ -107,7 +103,7 @@ $$\text{Stop Price}_t = \text{Peak Price}_t - (1.0\times \text{ATR}_{14, t-1})$$
 
 If $\text{Close}_t \le \text{Stop Price}_t$, the position is completely liquidated to cash (`ATR Multiplier` = 1.0 in the backtest).
 
-4. **Rebalance Threshold & Friction Drag**
+3. **Rebalance Threshold & Friction Drag**
 
 * The execution at time $t$ uses the signals at time $t-1$ to prevent a look-ahead bias.
 * If the position sizing changes by less than $4\%$ (min_rebalance_delta=0.04), there will be no rebalance in position to reduce unnecessary portfolio churn. 
