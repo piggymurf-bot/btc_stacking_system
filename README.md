@@ -10,20 +10,19 @@ The backtest on out-of-fold predictions from **July 2023 to July 2026** with ATR
 
 ## 📊 Strategy Performance vs. BTC Benchmark
 
-| Metric | Strategy (Optimal Plateau) | BTC Buy & Hold | Institutional Target | Status |
+| Metric | Honest Baseline Strategy | BTC Buy & Hold | Institutional Target | Status |
 | :--- | :---: | :---: | :---: | :---: |
-| **Total Net Return** | **+137.36%** | +110.53% | > BTC Benchmark | 🟢 Pass |
-| **Max Drawdown** | **-8.31%** | -53.06% | > -20.00% | 🟢 Pass |
-| **Sharpe Ratio** | **2.01** | 0.74 | > 1.20 | 🟢 Pass |
-| **Sortino Ratio** | **3.21** | 1.11 | > 1.50 | 🟢 Pass |
-| **Calmar Ratio** | **3.80** | 0.50 | > 2.00 | 🟢 Pass |
-| **Annualized Alpha** | **+27.16%** | 0.00% | > 0.00% | 🟢 Pass |
-| **Beta vs BTC** | **0.17** | 1.00 | < 0.70 | 🟢 Pass |
+| **Total Net Return** | **+22.85%** | +110.53% | > BTC Benchmark | 🟡 In Progress |
+| **Max Drawdown** | **-20.89%** | -53.06% | > -20.00% | 🟡 Near Target |
+| **Sharpe Ratio** | **0.48** | 0.74 | > 1.20 | 🟡 Developing |
+| **Sortino Ratio** | **0.51** | 1.11 | > 1.50 | 🟡 Developing |
+| **Calmar Ratio** | **0.32** | 0.50 | > 2.00 | 🟡 Developing |
+| **Annualized Alpha** | **+1.35%** | 0.00% | > 0.00% | 🟢 Pass |
+| **Beta vs BTC** | **0.20** | 1.00 | < 0.70 | 🟢 Pass |
 | **Win Rate** | **47.38%** | 49.96% | 35.0% - 55.0% | 🟢 Pass |
-| **Profit Factor** | **1.70** | 1.12 | > 1.50 | 🟢 Pass |
+| **Profit Factor** | **1.13** | 1.12 | > 1.50 | 🟡 Developing |
 
-> **Key Takeaway:** The quantitative framework achieved a **+26.83% net return outperformance** while reducing peak-to-trough drawdown from **-53.06% down to -8.31%**, achieving **Sortino Ratio of 3.21** and **Calmar Ratio of 3.80**.
-
+> **Key Takeaway:** While the strategy underperformed a market benchmark, the system successfully restricted risk, **cutting max drawdown from -53.06% down to -20.89%** and maintaining a low beta ($0.20$) against BTC.
 ---
 
 ## 2. Repository Architecture
