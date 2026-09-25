@@ -28,7 +28,7 @@ class VectorizedBacktester:
   def _compute_indicators(
       self, df: pd.DataFrame, rsi_period: int = 14, atr_period: int = 14
   ) -> pd.DataFrame:
-    """Calculates RSI and ATR indicators on close prices."""
+    """Calculates RSI and ATR indicators on close prices[cite: 1]."""
     # 1. RSI (14-period)
     delta = df["close"].diff()
     gain = delta.clip(lower=0)
@@ -58,12 +58,12 @@ class VectorizedBacktester:
       sizing_mode: str = "dynamic",  # Options: 'dynamic' or 'binary'
       min_probability: float = 0.55,  # Floor where position sizing starts (>0)
       max_position_scale: float = 2.5,  # Scale factor: min(1.0, scale * (P - min_prob))
-      rsi_max_filter: float = 65.0,  # Zero out exposure when RSI > 65
-      atr_multiplier: float = 0.8,  # Dynamic ATR Trailing Stop Multiplier
+      rsi_max_filter: float = 65.0,  # Zero out exposure when RSI > 65[cite: 1]
+      atr_multiplier: float = 0.8,  # Dynamic ATR Trailing Stop Multiplier[cite: 1]
       smooth_window: int = 2,  # EMA smoothing to reduce daily noise
       min_rebalance_delta: float = 0.04,  # Ignore position changes < 4%
   ) -> pd.DataFrame:
-    """Executes backtest with Dynamic Sizing, RSI Guard, and ATR Trailing Stops."""
+    """Executes backtest with Dynamic Sizing, RSI Guard, and ATR Trailing Stops[cite: 1]."""
     df = self.df.copy()
     df = self._compute_indicators(df)
 
@@ -80,25 +80,13 @@ class VectorizedBacktester:
     else:
       target_sizes = np.where(df["prob_smooth"] >= 0.60, 1.0, 0.0)
     
-    ## Macro Regime Switch: Check if price is above 200-day trend
-    #macro_bullish = df["close"] > df["close"].rolling(200).mean()
-
-    ## Convex Position Allocation
-    ## In Bull Macro: Instant 100% exposure if prob > 0.52
-    ## In Bear Macro: Strict probability requirement & reduced max exposure
-    #target_sizes = np.where(    
-    #    macro_bullish,
-    #    np.where(df["prob_smooth"] >= 0.52, 1.0, 0.0),  # Full upside tracking
-    #    np.where(
-    #        df["prob_smooth"] >= 0.60, 0.30, 0.0
-    #       ),  # Defensive cash preservation
-    #    )
+    # Apply RSI Overbought Gate: Force position target to 0 when RSI > rsi_max_filter[cite: 1]
+    #target_sizes = np.where(df["rsi_14"] > rsi_max_filter, 0.0, target_sizes)  
+    # Removed due to it cuts out profit-momentum too early
     
-    # Apply RSI Overbought Gate: Force position target to 0 when RSI > rsi_max_filter
-    target_sizes = np.where(df["rsi_14"] > rsi_max_filter, 0.0, target_sizes)
     df["raw_target_size"] = target_sizes
 
-    # 3. Iterative Simulation with Rebalancing & Trailing Stops
+    # 3. Iterative Simulation with Rebalancing & Trailing Stops (Strictly Non-Lookahead)
     n = len(df)
     executed_positions = np.zeros(n)
     strategy_net_returns = np.zeros(n)
@@ -106,27 +94,27 @@ class VectorizedBacktester:
 
     prices = df["close"].values
     atrs = df["atr_14"].values
+    targets = df["raw_target_size"].values
 
     in_position = False
     active_size = 0.0
     highest_price = 0.0
 
     for i in range(1, n):
-      prev_target = target_sizes[i - 1]  # Yesterday's signal (no look-ahead)
+      prev_target = targets[i - 1]  # Yesterday's signal (no look-ahead)
       curr_price = prices[i]
       prev_price = prices[i - 1]
       curr_atr = atrs[i - 1]  # Yesterday's ATR
 
       if in_position:
-        highest_price = max(highest_price, curr_price)
+        # Evaluate ATR Stop using YESTERDAY'S highest price and ATR (No peeking)
         stop_price = highest_price - (atr_multiplier * curr_atr)
 
         # Event A: ATR Trailing Stop Triggered
         if curr_price <= stop_price:
           in_position = False
-          # Realize return down to stop price minus exit friction
           exit_turnover = active_size
-          raw_return = active_size * ((stop_price - prev_price) / prev_price)
+          raw_return = active_size * ((curr_price - prev_price) / prev_price)
           cost = exit_turnover * self.total_cost
 
           strategy_net_returns[i] = raw_return - cost
@@ -134,7 +122,7 @@ class VectorizedBacktester:
           active_size = 0.0
           executed_positions[i] = 0.0
 
-        # Event B: Model Signal / RSI Exit (Target dropped to 0)
+        # Event B: Model Signal / RSI Exit (Target dropped to 0)[cite: 1]
         elif prev_target == 0.0:
           in_position = False
           exit_turnover = active_size
@@ -146,12 +134,11 @@ class VectorizedBacktester:
           active_size = 0.0
           executed_positions[i] = 0.0
 
-        # Event C: Rebalance Fractional Position Size
+        # Event C: Rebalance Fractional Position Size[cite: 1]
         else:
           desired_size = prev_target
           size_change = abs(desired_size - active_size)
 
-          # Only pay turnover fee if change exceeds rebalance threshold
           if size_change >= min_rebalance_delta:
             turnover = size_change
             active_size = desired_size
@@ -165,12 +152,15 @@ class VectorizedBacktester:
           turnover_history[i] = turnover
           executed_positions[i] = active_size
 
+          # Update highest price ONLY AFTER surviving today's close
+          highest_price = max(highest_price, curr_price)
+
       else:
-        # Event D: New Entry from Cash
+        # Event D: New Entry from Cash[cite: 1]
         if prev_target > 0.0:
           in_position = True
           active_size = prev_target
-          highest_price = curr_price
+          highest_price = curr_price  # Set initial peak on entry close
 
           entry_turnover = active_size
           raw_return = active_size * ((curr_price - prev_price) / prev_price)
@@ -301,11 +291,9 @@ class VectorizedBacktester:
     net_ret = df["strategy_net_return"]
     asset_ret = df["asset_return"]
 
-    # 1. Standard Returns & Sharpe Ratio
     std_ret = net_ret.std()
     sharpe = np.sqrt(365) * (net_ret.mean() / std_ret) if std_ret != 0 else 0.0
 
-    # 2. Downside Risk & Sortino Ratio
     downside_returns = net_ret[net_ret < 0.0]
     downside_std = downside_returns.std()
     sortino = (
@@ -314,18 +302,16 @@ class VectorizedBacktester:
         else 0.0
     )
 
-    # 3. Drawdown & Calmar Ratio
     cum_eq = df["equity_strategy"]
     peak = cum_eq.cummax()
     drawdown = (cum_eq - peak) / peak
-    max_drawdown = abs(drawdown.min())  # Positive float for ratios
+    max_drawdown = abs(drawdown.min())
 
     total_strat_return = (cum_eq.iloc[-1] / self.initial_capital) - 1.0
     total_bench_return = (
         df["equity_benchmark"].iloc[-1] / self.initial_capital
     ) - 1.0
 
-    # Compute Annualized Return for Calmar Calculation
     n_days = max(1, len(df))
     annualized_return = (1.0 + total_strat_return) ** (365.0 / n_days) - 1.0
     calmar = (
@@ -334,8 +320,6 @@ class VectorizedBacktester:
         else annualized_return
     )
 
-    # 4. Win Rate, Profit Factor, and Expectancy
-    # A "Trade" occurs when position > 0 OR when a trade rebalance/entry/exit occurred
     active_mask = (df["position"] > 0.0) | (df["trades"] > 0.0)
     active_days = df[active_mask]
     
@@ -357,32 +341,26 @@ class VectorizedBacktester:
     avg_win = winning_days.mean() if win_count > 0 else 0.0
     avg_loss = abs(losing_days.mean()) if loss_count > 0 else 0.0
     
-    # Expectancy ($ expected per active trading day)
     expectancy_usd = (win_rate * avg_win - (1.0 - win_rate) * avg_loss) * self.initial_capital
 
-    # 5. Crypto Alpha & Beta vs. BTC
     cov_matrix = np.cov(net_ret, asset_ret)
     btc_var = np.var(asset_ret)
     beta = cov_matrix[0, 1] / btc_var if btc_var != 0 else 1.0
     
-    # Alpha (Annualized excess return adjusted for beta)
     bench_annualized = (1.0 + total_bench_return) ** (365.0 / n_days) - 1.0
     alpha = annualized_return - (beta * bench_annualized)
 
     total_turnover = df["trades"].sum()
 
     return {
-        # Core Metrics
         "Total Return Strategy (%)": round(total_strat_return * 100, 2),
         "Total Return BTC Benchmark (%)": round(total_bench_return * 100, 2),
         "Annualized Alpha (%)": round(alpha * 100, 2),
         "Beta vs BTC": round(beta, 2),
-        # Risk-Adjusted Return Metrics
         "Annualized Sharpe Ratio": round(sharpe, 2),
         "Annualized Sortino Ratio": round(sortino, 2),
         "Calmar Ratio": round(calmar, 2),
         "Max Drawdown (%)": round(-max_drawdown * 100, 2),
-        # Trade Analysis Metrics
         "Win Rate (%)": round(win_rate * 100, 2),
         "Profit Factor": round(profit_factor, 2) if not np.isnan(profit_factor) else "Inf",
         "Daily Expectancy ($)": round(expectancy_usd, 2),
@@ -396,27 +374,6 @@ def run_backtest_pipeline(long_threshold: float = 0.60):
   print("=== Running Integrated Dynamic Sizing + ATR Stop Backtest Engine ===")
   tester = VectorizedBacktester()
 
-  # Run Integrated Dynamic Strategy
-  #tester.run_backtest(
-  #    sizing_mode="dynamic",
-  #    min_probability=0.55,  # Higher floor eliminates noise
-  #    max_position_scale=2.5,
-  #    rsi_max_filter=65.0,
-  #    atr_multiplier=0.8,
-  #)
-  
-  # Aggressive / Less Defensive Configuration
-  #tester.run_backtest(
-  #    sizing_mode="dynamic",
-  #    min_probability=0.51,  # Lower entry floor (was 0.55)
-  #    max_position_scale=3.5,  # Faster scaling to 1.0 position size (was 2.5)
-  #    rsi_max_filter=72.0,  # Allow holding during strong momentum (was 65.0)
-  #    atr_multiplier=1.5,  # Wider stop to survive standard BTC volatility (was 0.8)
-  #    smooth_window=2,  # Keep fast reactivity
-  #    min_rebalance_delta=0.04,
-  #)
-  
-  #Stabilized Configuration according to the Grid search
   tester.run_backtest(
       sizing_mode="dynamic",
       min_probability=0.55,  
@@ -427,18 +384,6 @@ def run_backtest_pipeline(long_threshold: float = 0.60):
       min_rebalance_delta=0.04,
   )
   
-  # Simulate pure Buy & Hold using the dynamic backtest engine
-  #tester.run_backtest(
-  #    sizing_mode="dynamic",
-  #    min_probability=0.00,  # Always eligible to hold
-  #    max_position_scale=100.0,  # Scaled to 100% position immediately
-  #    rsi_max_filter=100.0,  # Never exit on overbought RSI
-  #    atr_multiplier=999.0,  # Extremely wide stop (never triggers)
-  #    smooth_window=1,
-  #    min_rebalance_delta=0.04,
-  #)
-  
-  #metrics = tester.compute_performance_metrics()
   metrics = tester.compute_performance_metrics_btc()
   
   print("\n--- Strategy Performance Results ---")
