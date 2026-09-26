@@ -24,15 +24,30 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run Paper Trade Script
+      # Run Data Ingestion 
+      - name: Run Centralized Data Ingestion
         env:
           MY_TOKEN: ${{ secrets.MY_TOKEN }}
+        run: python paper_trade_dataloader.py
+
+      # Run Legacy Strategy (Old params, no ATR)
+      - name: Run Paper Trade
         run: python paper_trade.py
+
+      # Run Optimized Strategy (New params, no ATR)
+      - name: Run Optimized Paper Trade (No ATR)
+        run: python paper_trade_optimized.py
+
+      # Run Optimized Strategy + ATR Stop (New params, with ATR)
+      - name: Run Optimized Paper Trade (With ATR)
+        run: python paper_trade_optimized_atr.py
 
       - name: Commit updated database
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add data/paper_trading.db
+          git add data/paper_trading_optimized.db
+          git add data/paper_trading_optimized_atr.db
           git diff --quiet && git diff --staged --quiet || git commit -m "Auto-update paper trading database [skip ci]"
           git push

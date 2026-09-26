@@ -66,7 +66,8 @@ def compute_forward_alpha_targets(
 def process_alpha_targets(
     dir_path: str = "data/processed",
     matrix_file: str = "master_feature_addlhar.csv",
-    horizons: list = [1, 3, 7, 14]
+    #horizons: list = [1, 3, 7, 14]
+    horizons: list = [1]
 ):
     """Loads raw data, constructs alpha targets, drops trailing NaNs, and saves the output."""
     master_path = os.path.join(dir_path, matrix_file)

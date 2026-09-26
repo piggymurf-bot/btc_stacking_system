@@ -12,8 +12,6 @@ def run_bgeometrics_feature_extraction(bg_data: pd.DataFrame) -> pd.DataFrame:
     if(df.isna().values.any()):
         df = df.ffill()
         
-    #Treating features that are broken by the standard scaler
-    
     
     #Log-transform raw capital volumes to compress exponential variance spikes
     #We use a signed log transformation because nrplbtc contains negative numbers

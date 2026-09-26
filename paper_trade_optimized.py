@@ -23,17 +23,17 @@ updated_at = datetime.now(timezone.utc).isoformat()
 # -----------------------------------------------------------------------------
 # CONFIGURATION & CONSTANTS
 # -----------------------------------------------------------------------------
-DB_PATH = "data/paper_trading.db"
+DB_PATH = "data/paper_trading_optimized.db"
 MODEL_PATH = "models/stacking_ensemble.pkl"
 SYMBOL = "BTCUSDT"
 TIMEFRAME = "1d"
 INITIAL_CAPITAL = 10000.0  # $10,000 Starting paper capital
 
-# Strategy Parameters 
-MIN_PROBABILITY = 0.55
-MAX_POSITION_SCALE = 3.0
+# Strategy Parameters (Optimized based on GridSearch)
+MIN_PROBABILITY = 0.60
+MAX_POSITION_SCALE = 4.5
 RSI_MAX_FILTER = 75.0
-ATR_MULTIPLIER = 1.0
+ATR_MULTIPLIER = 0.75
 
 
 

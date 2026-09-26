@@ -11,6 +11,7 @@ class VectorizedBacktester:
   def __init__(
       self,
       predictions_path: str = "data/processed/holdout_predictions.csv",
+      features_path: str = "data/processed/holdout_predictions.csv",
       initial_capital: float = 10000.0,
       trading_fee: float = 0.0006,  # 0.06% exchange taker fee
       slippage: float = 0.0002,  # 0.02% estimated market impact

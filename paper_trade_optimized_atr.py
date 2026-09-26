@@ -23,17 +23,17 @@ updated_at = datetime.now(timezone.utc).isoformat()
 # -----------------------------------------------------------------------------
 # CONFIGURATION & CONSTANTS
 # -----------------------------------------------------------------------------
-DB_PATH = "data/paper_trading.db"
+DB_PATH = "data/paper_trading_optimized_atr.db"
 MODEL_PATH = "models/stacking_ensemble.pkl"
 SYMBOL = "BTCUSDT"
 TIMEFRAME = "1d"
 INITIAL_CAPITAL = 10000.0  # $10,000 Starting paper capital
 
-# Strategy Parameters 
-MIN_PROBABILITY = 0.55
-MAX_POSITION_SCALE = 3.0
+# Strategy Parameters (Optimized based on GridSearch)
+MIN_PROBABILITY = 0.60
+MAX_POSITION_SCALE = 4.5
 RSI_MAX_FILTER = 75.0
-ATR_MULTIPLIER = 1.0
+ATR_MULTIPLIER = 0.75
 
 
 
@@ -58,6 +58,8 @@ def init_db():
             btc_units REAL,
             last_close REAL,
             total_equity REAL,
+            in_position INTEGER,
+            highest_price REAL,
             updated_at TEXT
         )
     """)
@@ -80,7 +82,7 @@ def init_db():
     cursor.execute("SELECT COUNT(*) FROM portfolio")
     if cursor.fetchone()[0] == 0:
         cursor.execute(
-            "INSERT INTO portfolio VALUES (1, ?, 0.0, 0.0, ?, ?)",
+            "INSERT INTO portfolio VALUES (1, ?, 0.0, 0.0, ?, 0, 0.0, ?)",
             (INITIAL_CAPITAL, INITIAL_CAPITAL, datetime.now(timezone.utc).isoformat())
         )
         conn.commit()
@@ -96,15 +98,15 @@ def get_portfolio_state():
     return df.iloc[0].to_dict()
 
 
-def update_portfolio_state(cash, btc_units, last_close):
-    """Updates paper balance after trade execution."""
+def update_portfolio_state(cash, btc_units, last_close, in_position, highest_price):
+    """Updates paper balance and risk-state after trade execution."""
     total_equity = cash + (btc_units * last_close)
     updated_at = datetime.now(timezone.utc).isoformat()
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute(
-        "UPDATE portfolio SET cash=?, btc_units=?, last_close=?, total_equity=?, updated_at=? WHERE id=1",
-        (cash, btc_units, last_close, total_equity, updated_at)
+        "UPDATE portfolio SET cash=?, btc_units=?, last_close=?, total_equity=?, in_position=?, highest_price=?, updated_at=? WHERE id=1",
+        (cash, btc_units, last_close, total_equity, int(in_position), highest_price, updated_at)
     )
     conn.commit()
     conn.close()
@@ -214,6 +216,8 @@ def generate_live_signal(df_market):
     if not os.path.exists(MODEL_PATH):
         raise FileNotFoundError(f"Model file not found at {MODEL_PATH}. Train your model first.")
     
+    
+    
     model = joblib.load(MODEL_PATH)
     
     # Extract last 10 days features
@@ -236,7 +240,11 @@ def generate_live_signal(df_market):
         target_pos = float(np.clip(MAX_POSITION_SCALE * (prob - MIN_PROBABILITY), 0.0, 1.0))
 
     latest_close = float(df_market["Close"].iloc[-1])
-    return prob, target_pos, latest_close
+    
+    latest_atr14 = float(df_market["yf_atr14_pct"].iloc[-1])*latest_close
+    
+    
+    return prob, target_pos, latest_close, latest_atr14
 
 # Safeguard from run paper-trade several times a day
 
@@ -257,48 +265,67 @@ def has_traded_today():
 # 4. PAPER EXECUTION ENGINE
 # -----------------------------------------------------------------------------
 def execute_paper_trade():
-    """Calculates rebalance requirements and executes simulated trade."""
+    """Calculates rebalance requirements, evaluates ATR trailing stops, and executes simulated trade."""
     
     if has_traded_today():
-      print("⏸️ Already executed a paper trade today. Skipping duplicate run.")
+      print(" Already executed a paper trade today. Skipping duplicate run.")
       return
     
     # 1. Get live price and prediction
     df_market = fetch_daily_data()
-    model_prob, target_pos, current_price = generate_live_signal(df_market)
+    model_prob, target_pos, current_price, current_atr14 = generate_live_signal(df_market)
     
     init_db()
     state = get_portfolio_state()
 
     current_cash = state["cash"]
     current_btc = state["btc_units"]
-    total_equity = current_cash + (current_btc * current_price)
+    in_position = bool(state["in_position"])
+    highest_price = state["highest_price"]
+    
+    # -------------------------------------------------------------------------
+    # ATR TRAILING STOP EVALUATION (Mirrors engine.py logic)
+    # -------------------------------------------------------------------------
+    atr_triggered = False
+    if in_position:
+        # Update high-water mark first
+        highest_price = max(highest_price, current_price)
+        
+        # Calculate trailing stop line
+        stop_price = highest_price - (ATR_MULTIPLIER * current_atr14)
+        
+        print(f"ATR Trailing Stop Line: ${stop_price:,.2f} (Peak: ${highest_price:,.2f}, ATR: ${current_atr14:,.2f})")
+        
+        if current_price <= stop_price:
+            print(f"🚨 ATR STOP TRIGGERED! Price (${current_price:,.2f}) breached stop line (${stop_price:,.2f}).")
+            target_pos = 0.0  # Force total exit
+            atr_triggered = True
 
+    total_equity = current_cash + (current_btc * current_price)
     target_btc_usd = total_equity * target_pos
     current_btc_usd = current_btc * current_price
     delta_usd = target_btc_usd - current_btc_usd
 
-    print("\n--- 📊 Live Paper Trade Execution ---")
+    print("\n--- 📊 Live Paper Trade Execution (Optimized + ATR) ---")
     print(f"Current BTC Price : ${current_price:,.2f}")
     print(f"Model Signal Prob : {model_prob:.4f}")
     print(f"Target Position   : {target_pos * 100:.1f}% (${target_btc_usd:,.2f})")
     print(f"Current Portfolio : Cash=${current_cash:,.2f} | BTC={current_btc:.4f} (${current_btc_usd:,.2f})")
     print(f"Total Equity      : ${total_equity:,.2f}")
 
-    # HYSTERESIS / REBALANCE THRESHOLD
-    # Require at least a 10% shift in portfolio allocation to justify trading
-    REBALANCE_THRESHOLD_PCT = 0.10  # 10% shift
+    # Rebalance Threshold (Skip if ATR triggered—force immediate exit)
+    REBALANCE_THRESHOLD_PCT = 0.10
     MIN_TRADE_USD = total_equity * REBALANCE_THRESHOLD_PCT
 
-    if abs(delta_usd) < MIN_TRADE_USD:
-        print(f"✅ Rebalance delta (${abs(delta_usd):,.2f}) below threshold (${MIN_TRADE_USD:,.2f}). Holding position.")
-        update_portfolio_state(current_cash, current_btc, current_price)
+    if not atr_triggered and abs(delta_usd) < MIN_TRADE_USD:
+        print(f"✅ Rebalance delta (${abs(delta_usd):,.2f}) below threshold. Holding position.")
+        update_portfolio_state(current_cash, current_btc, current_price, in_position, highest_price)
         return
 
-    # Execute BUY
+    # Execute BUY (New Entry or Scaling Up)
     if delta_usd > 0:
         units_to_buy = delta_usd / current_price
-        cost_with_fee = delta_usd * 1.0008  # Account for 0.08% taker fee + slippage
+        cost_with_fee = delta_usd * 1.0008  
         
         if cost_with_fee > current_cash:
             units_to_buy = current_cash / (current_price * 1.0008)
@@ -307,13 +334,17 @@ def execute_paper_trade():
         new_cash = current_cash - (units_to_buy * current_price * 1.0008)
         new_btc = current_btc + units_to_buy
         
-        update_portfolio_state(new_cash, new_btc, current_price)
-        log_trade("BUY", current_price, units_to_buy, delta_usd, target_pos, model_prob)
-        print(f"🟢 EXECUTED BUY: {units_to_buy:.6f} BTC @ ${current_price:,.2f} (Value: ${delta_usd:,.2f})")
+        # Entering or updating position state
+        in_position = True
+        highest_price = max(highest_price, current_price) if highest_price > 0 else current_price
 
-    # Execute SELL
-    elif delta_usd < 0:
-        usd_to_sell = abs(delta_usd)
+        update_portfolio_state(new_cash, new_btc, current_price, in_position, highest_price)
+        log_trade("BUY", current_price, units_to_buy, delta_usd, target_pos, model_prob)
+        print(f"🟢 EXECUTED BUY: {units_to_buy:.6f} BTC @ ${current_price:,.2f}")
+
+    # Execute SELL (Model exit, rebalance down, or ATR Stop triggered)
+    elif delta_usd < 0 or atr_triggered:
+        usd_to_sell = abs(delta_usd) if not atr_triggered else current_btc * current_price
         units_to_sell = usd_to_sell / current_price
         
         if units_to_sell > current_btc:
@@ -323,10 +354,15 @@ def execute_paper_trade():
         new_cash = current_cash + proceeds_after_fee
         new_btc = current_btc - units_to_sell
 
-        update_portfolio_state(new_cash, new_btc, current_price)
-        log_trade("SELL", current_price, units_to_sell, usd_to_sell, target_pos, model_prob)
-        print(f"🔴 EXECUTED SELL: {units_to_sell:.6f} BTC @ ${current_price:,.2f} (Value: ${usd_to_sell:,.2f})")
+        # Reset position states if fully exited
+        if new_btc <= 0.00001:
+            in_position = False
+            highest_price = 0.0
 
+        update_portfolio_state(new_cash, new_btc, current_price, in_position, highest_price)
+        action_label = "ATR_STOP_EXIT" if atr_triggered else "SELL"
+        log_trade(action_label, current_price, units_to_sell, usd_to_sell, target_pos, model_prob)
+        print(f"🔴 EXECUTED {action_label}: {units_to_sell:.6f} BTC @ ${current_price:,.2f}")
 
 # -----------------------------------------------------------------------------
 # MAIN RUNNER
