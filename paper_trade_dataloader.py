@@ -50,3 +50,6 @@ def daily_dataloader(symbol=SYMBOL, timeframe=TIMEFRAME, limit=300):
     fetch_yfinance_data(
         symbol='BTC-USD', start_date_str=yf_buffered_start, end_date_str=yf_buffered_end
     )
+
+if __name__ == "__main__":
+    daily_dataloader()
