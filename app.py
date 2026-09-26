@@ -53,7 +53,7 @@ preset = st.sidebar.radio(
     options=[
         "🛡️ Defensive (Capital Preservation)",
         "🚀 Aggressive (Upside Capture)",
-        "🕹️ Stabilize (Based on Grid search)",
+        "🕹️ Optimize (Based on Grid search)",
         "⚙️ Custom Configuration",
     ],
     index=0,
@@ -73,11 +73,11 @@ elif "Aggressive" in preset:
   default_scale = 3.5
   default_rsi = 72.0
   default_atr = 1.5
-elif "Stabilize" in preset:
- default_min_prob = 0.55
- default_scale = 3.0
+elif "Optimize" in preset:
+ default_min_prob = 0.60
+ default_scale = 4.5
  default_rsi = 75.0
- default_atr = 1.00 
+ default_atr = 0.75 
 else:
   default_min_prob = 0.53
   default_scale = 3.0
@@ -103,14 +103,15 @@ max_scale = st.sidebar.slider(
     help="Speed at which allocation scales to 1.0 based on model confidence.",
 )
 
-rsi_filter = st.sidebar.slider(
-    "RSI Overbought Cutoff Gate",
-    min_value=60.0,
-    max_value=85.0,
-    value=default_rsi,
-    step=1.0,
-    help="Forces target position to 0 when RSI exceeds this threshold.",
-)
+rsi_filter = default_rsi
+#rsi_filter = st.sidebar.slider(
+#    "RSI Overbought Cutoff Gate",
+#    min_value=60.0,
+#    max_value=85.0,
+#    value=default_rsi,
+#    step=1.0,
+#    help="Forces target position to 0 when RSI exceeds this threshold.",
+#)
 
 atr_mult = st.sidebar.slider(
     "ATR Trailing Stop Multiplier",
@@ -252,7 +253,7 @@ with tab2:
         "ATR Multiplier": ("atr_multiplier", np.linspace(0.5, 2.5, 9)),
         "Minimum Probability Floor": ("min_probability", np.linspace(0.50, 0.65, 7)),
         "Position Scaling Multiplier": ("max_position_scale", np.linspace(1.5, 5.0, 8)),
-        "RSI Overbought Gate": ("rsi_max_filter", np.linspace(60.0, 85.0, 6)),
+        #"RSI Overbought Gate": ("rsi_max_filter", np.linspace(60.0, 85.0, 6)),
     }
 
     col_x, col_y = st.columns(2)
