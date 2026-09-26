@@ -373,13 +373,55 @@ def run_backtest_pipeline(long_threshold: float = 0.60):
   """Execution wrapper called by main.py."""
   print("=== Running Integrated Dynamic Sizing + ATR Stop Backtest Engine ===")
   tester = VectorizedBacktester()
-
+  
+  # Run Integrated Dynamic Strategy
+  #tester.run_backtest(
+  #    sizing_mode="dynamic",
+  #    min_probability=0.55,  # Higher floor eliminates noise
+  #    max_position_scale=2.5,
+  #    rsi_max_filter=65.0,
+  #    atr_multiplier=0.8,
+  #)
+  
+  # Aggressive / Less Defensive Configuration
+  #tester.run_backtest(
+  #    sizing_mode="dynamic",
+  #    min_probability=0.51,  # Lower entry floor (was 0.55)
+  #    max_position_scale=3.5,  # Faster scaling to 1.0 position size (was 2.5)
+  #    rsi_max_filter=72.0,  # Allow holding during strong momentum (was 65.0)
+  #    atr_multiplier=1.5,  # Wider stop to survive standard BTC volatility (was 0.8)
+  #    smooth_window=2,  # Keep fast reactivity
+  #    min_rebalance_delta=0.04,
+  #)
+  
+  #Stabilized Configuration according to the Grid search
+  #tester.run_backtest(
+  #    sizing_mode="dynamic",
+  #    min_probability=0.55,  
+  #    max_position_scale=3.0,  
+  #    rsi_max_filter=75.0,  
+  #    atr_multiplier=1.0,  
+  #    smooth_window=2,  
+  #    min_rebalance_delta=0.04,
+  #)
+  
+  # Simulate pure Buy & Hold using the dynamic backtest engine
+  #tester.run_backtest(
+  #    sizing_mode="dynamic",
+  #    min_probability=0.00,  # Always eligible to hold
+  #    max_position_scale=100.0,  # Scaled to 100% position immediately
+  #    rsi_max_filter=100.0,  # Never exit on overbought RSI
+  #    atr_multiplier=999.0,  # Extremely wide stop (never triggers)
+  #    smooth_window=1,
+  #    min_rebalance_delta=0.04,
+  #)
+  
   tester.run_backtest(
       sizing_mode="dynamic",
-      min_probability=0.55,  
-      max_position_scale=3.0,  
+      min_probability=0.60,  
+      max_position_scale=4.5,  
       rsi_max_filter=75.0,  
-      atr_multiplier=1.0,  
+      atr_multiplier=0.75,  
       smooth_window=2,  
       min_rebalance_delta=0.04,
   )
