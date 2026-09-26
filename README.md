@@ -6,21 +6,21 @@ This project utilized a machine learning model in a pipeline for a Bitcoin (BTC)
 
 ## 1. Summary & Strategy Performance
 
-The backtest on out-of-fold predictions from **July 2023 to July 2026** with ATR Multiplier: 1.0 and RSI Gate: 75.0 (the stabilized setting) yields the following results compared to the passive BTC Buy & Hold Benchmark: 
+The backtest on out-of-fold predictions from **July 2023 to July 2026** with Signal Probability Floor: 0.6, Position Multiplier: 4.5, and ATR Multiplier: 0.75  (the optimized setting based on gridsearch) yields the following results compared to the passive BTC Buy & Hold Benchmark: 
 
 ## 📊 Strategy Performance vs. BTC Benchmark
 
-| Metric | Optimized Strategy (No RSI Gate) | BTC Buy & Hold | Institutional Target | Status |
+| Metric | Optimized Strategy | BTC Buy & Hold | Institutional Target | Status |
 | :--- | :---: | :---: | :---: | :---: |
-| **Total Net Return** | **+45.24%** | +110.53% | > BTC Benchmark | 🟡 In Progress |
-| **Max Drawdown** | **-22.57%** | -53.06% | > -20.00% | 🟡 Near Target |
-| **Sharpe Ratio** | **0.72** | 0.74 | > 1.20 | 🟢 Competitive |
-| **Sortino Ratio** | **0.83** | 1.11 | > 1.50 | 🟢 Competitive |
-| **Calmar Ratio** | **0.56** | 0.50 | > 2.00 | 🟡 Developing |
-| **Annualized Alpha** | **+5.76%** | 0.00% | > 0.00% | 🟢 Pass |
+| **Total Net Return** | **+66.31%** | +110.53% | > BTC Benchmark | 🟡 In Progress |
+| **Max Drawdown** | **-21.67%** | -53.06% | > -20.00% | 🟡 Near Target |
+| **Sharpe Ratio** | **0.88** | 0.74 | > 1.20 | 🟡 Developing |
+| **Sortino Ratio** | **0.96** | 1.11 | > 1.50 | 🟡 Developing |
+| **Calmar Ratio** | **0.81** | 0.50 | > 2.00 | 🟡 Developing |
+| **Annualized Alpha** | **+10.57%** | 0.00% | > 0.00% | 🟢 Pass |
 | **Beta vs BTC** | **0.26** | 1.00 | < 0.70 | 🟢 Pass |
-| **Win Rate** | **47.69%** | 49.96% | 35.0% - 55.0% | 🟢 Pass |
-| **Profit Factor** | **1.18** | 1.12 | > 1.50 | 🟡 Developing |
+| **Win Rate** | **48.46%** | 49.96% | 35.0% - 55.0% | 🟢 Pass |
+| **Profit Factor** | **1.24** | 1.12 | > 1.50 | 🟡 Developing |
 
 > **Key Takeaway:** While the strategy underperformed a market benchmark, the system successfully restricted risk, **cutting max drawdown from -53.06% down to -20.89%** and maintaining a low beta ($0.20$) against BTC.
 ---
