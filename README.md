@@ -1,12 +1,12 @@
 # BTC Stacking Ensemble Trading System
 
-This project utilized a machine learning model in a pipeline for a Bitcoin (BTC) quantitative trading system, aiming to assist in BTC portfolio allocation. The system ingests multi-source market data: On-chain metrics, Derivatives/Funding Rates, and Technical Spot Price indicators, and trains a domain-segmented meta-learner (using time-series splitting). The predicted probability is evaluated together with RSI momentum filters and dynamic Average True Range (ATR) trailing stops in making a decision on positioning between cash and BTC in the portfolio. 
+This project utilized a machine learning model in a pipeline for a Bitcoin (BTC) quantitative trading system, aiming to assist in BTC portfolio allocation. The system ingests multi-source market data: On-chain metrics, Derivatives/Funding Rates, and Technical Spot Price indicators, and trains a domain-segmented meta-learner (using time-series splitting). The predicted probability is evaluated together with Average True Range (ATR) trailing stops in making a decision on positioning between cash and BTC in the portfolio. 
 
 ---
 
 ## 1. Summary & Strategy Performance
 
-The backtest on out-of-fold predictions from **July 2023 to July 2026** with Signal Probability Floor: 0.6, Position Multiplier: 4.5, and ATR Multiplier: 0.75  (the optimized setting based on gridsearch) yields the following results compared to the passive BTC Buy & Hold Benchmark: 
+The backtest on out-of-fold predictions from **July 2023 to July 2026** with Signal Probability Floor: 0.6, Position Multiplier: 4.5, and ATR Multiplier: 0.75  (the optimized setting based on grid search) yields the following results compared to the passive BTC Buy & Hold Benchmark: 
 
 ## 📊 Strategy Performance vs. BTC Benchmark
 
@@ -51,7 +51,7 @@ btc_stacking_system/
 │   │   └── train_model.py          # Generate OOF prediction via time-series splitting 
 │   └── backtest/
 │       ├── __init__.py
-│       └── engine.py               # Backtesting with Vectorized simulator (Dynamic Sizing + ATR/RSI Gates)
+│       └── engine.py               # Backtesting with Vectorized simulator (Dynamic Sizing + ATR Gates)
 ├── .github/workflows/
 │   └── paper_trade.yml             # Automated daily execution pipeline
 ├── app.py			                    # Interactive dashboard
