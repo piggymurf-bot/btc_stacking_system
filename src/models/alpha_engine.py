@@ -6,6 +6,7 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error
 from sklearn.model_selection import TimeSeriesSplit
 
 from src.config_v2 import FEATURE_GROUPS
+from src.features.fracdiff import frac_diff_ffd,find_optimal_d
 
 ONCHAIN_FEATURES = FEATURE_GROUPS["onchain_features"]
 
@@ -26,27 +27,13 @@ def train_alpha_model(
         df["date"] = pd.to_datetime(df["date"])
         df = df.sort_values("date").reset_index(drop=True)
 
-    # 1. Isolate Features (X) and Target (y)
-    # Ensure all selected features actually exist in the dataframe
-    available_features = [f for f in ONCHAIN_FEATURES if f in df.columns]
-    missing_check = set(ONCHAIN_FEATURES) - set(available_features)
-    if missing_check:
-        print(f"⚠️ Warning: The following features were missing and dropped: {missing_check}")
-
-    # Drop rows with NaNs in features or target
-    model_df = df[available_features + [target_col, "date"]].dropna().reset_index(drop=True)
+       
+    y = df[target_col]
     
-    X = model_df[available_features]
-    y = model_df[target_col]
-    dates = model_df["date"]
-
-    print(f"🎯 Training target: {target_col}")
-    print(f"📊 Dataset shape: {X.shape[0]} rows, {X.shape[1]} features")
-
-    # 2. Walk-Forward Time Series Cross-Validation
+    # Walk-Forward Time Series Cross-Validation
     tscv = TimeSeriesSplit(n_splits=5)
     
-    oof_preds = np.zeros(len(model_df))
+    oof_preds = np.zeros(len(df))
     fold_scores = []
 
     params = {
@@ -57,16 +44,54 @@ def train_alpha_model(
         "learning_rate": 0.03,
         "max_depth": 4,
         "num_leaves": 15,
-        "subsample": 0.8,
-        "colsample_bytree": 0.8,
+        "subsample": 0.7,
+        "subsample_freq": 1,        # Enables row resampling per iteration
+        "colsample_bytree": 0.5,    # Encourages broader feature usage
+        "reg_alpha": 0.1,           # L1 regularization for sparse noise reduction
+        "reg_lambda": 1.0,          # L2 regularization to control weight magnitudes
         "random_state": 42,
         "verbose": -1
     }
 
-    for fold, (train_idx, val_idx) in enumerate(tscv.split(X)):
-        X_train, X_val = X.iloc[train_idx], X.iloc[val_idx]
-        y_train, y_val = y.iloc[train_idx], y.iloc[val_idx]
+    # List of cumulative non-stationary features to transform
+    non_stationary_cols = [ 'aviv', 'mvrv', 'nupl', 'nrplbtc_log', 'close']
+    
+    # Assign the DataFrame to collect optimum d
+    d_opt_df = pd.DataFrame(columns=non_stationary_cols,index=range(1))
+    
+    for fold, (train_idx, val_idx) in enumerate(tscv.split(df)):
 
+        train_df = df.iloc[train_idx].copy()
+        val_df = df.iloc[val_idx].copy()
+
+        for col in non_stationary_cols:
+
+            # Prepare the series (applying log if close or positive values)
+            series_train = np.log(train_df[col]) if col == 'close' or (train_df[col] > 0).all() else train_df[col]
+            series_val = np.log(val_df[col]) if col == 'close' or (val_df[col] > 0).all() else val_df[col]
+
+            # CONDITION: Optimize on Fold 0 (the first fold), lock and reuse for later folds
+            if fold == 0:
+                optimal_d = find_optimal_d(series_train, p_thres=0.05)
+                d_opt_df[f'{col}'] = optimal_d  # Collect the optimal d for each column
+                #print(f"[Fold {fold}] Calculated and locked d* for {col}: {optimal_d}")
+            else:
+                optimal_d = d_opt_df.loc[0,f'{col}']  # Reuse the locked value
+                #print(f"[Fold {fold}] Reusing locked d* for {col}: {optimal_d}")
+            
+            # Apply fractional differentiation using the determined d
+            train_df[f'{col}_fracdiff'] = frac_diff_ffd(series_train, d=optimal_d)
+            val_df[f'{col}_fracdiff'] = frac_diff_ffd(series_val, d=optimal_d)
+
+        # Ensure all selected features actually exist in the dataframe
+        available_features = [f for f in ONCHAIN_FEATURES if f in train_df.columns]
+        missing_check = set(ONCHAIN_FEATURES) - set(available_features)
+        if missing_check:
+            print(f"⚠️ Warning: The following features were missing and dropped: {missing_check}")
+
+        X_train, X_val = train_df[available_features], val_df[available_features]
+        y_train, y_val = train_df[target_col], val_df[target_col]
+  
         # Initialize and fit LightGBM
         model = lgb.LGBMRegressor(**params)
         
@@ -92,7 +117,7 @@ def train_alpha_model(
     overall_mae = mean_absolute_error(y[valid_mask], oof_preds[valid_mask])
     
     print("\n" + "="*40)
-    print("✅ Group 1 LightGBM Training Complete!")
+    print(f"✅ Group 1 LightGBM Training Complete!")
     print(f"📊 Overall Out-of-Fold RMSE: {overall_rmse:.5f}")
     print(f"📊 Overall Out-of-Fold MAE:  {overall_mae:.5f}")
     print("="*40)
@@ -104,8 +129,12 @@ def train_alpha_model(
     }).sort_values(by="importance", ascending=False)
 
     print("\nTop 5 Most Predictive On-Chain Features for 1-Day Return:")
-    print(importance_df.head(5).to_string(index=False))
+    print(importance_df.head(10).to_string(index=False))
 
+    # Save optimal d for processing daily dataset 
+    d_opt_path = os.path.join('data/processed', 'optimal_d_alpha.csv')
+    d_opt_df.to_csv(d_opt_path, index=True)
+    
     return model, importance_df
 
 if __name__ == "__main__":

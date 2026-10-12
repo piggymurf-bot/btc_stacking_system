@@ -7,8 +7,10 @@ from dotenv import load_dotenv
 #from src.data import run_full_data_pipeline
 from src.data.merge_raw_collected import merge_raw_to_collected
 from src.features import process_and_merge_csvs_v2
-from src.features.check_features import check_missing_features
-#from src.models.train_model import run_training_pipeline
+#from src.features.check_features import check_missing_features
+from src.models.alpha_engine import train_alpha_model
+from src.models.alpha_ridge_baseline import train_alpha_model_ridge
+from src.models.volatility_engine import train_volatility_model
 #from src.backtest.engine import run_backtest_pipeline
 
 # 1. Load API keys from environment file
@@ -37,13 +39,10 @@ def main():
       help='Processing downloaded data',
   )
   parser.add_argument(
-      '--check-features',
+      '--train',
       action='store_true',
       help='Check for missing features',
   )
-#  parser.add_argument(
-#      '--train', action='store_true', help='Train stacking ensemble model'
-#  )
 #  parser.add_argument(
 #      "--backtest",
 #      action="store_true",
@@ -89,12 +88,11 @@ def main():
     print('--> Building Features for Stacking Pipeline...')
     process_and_merge_csvs_v2()
     
-  if args.check_features:
-    print('--> Checking for missing Features...')
-    check_missing_features()
-  #if args.train:
-  #  print('--> Training Stacking Pipeline...')
-  #  run_training_pipeline()
+  if args.train:
+    print('--> Training Alpha and Volatility engines...')
+    train_alpha_model()
+    #train_alpha_model_ridge()
+    train_volatility_model()
    
   #if args.backtest:
   #  print('--> Executing Backtesting Engine...')  

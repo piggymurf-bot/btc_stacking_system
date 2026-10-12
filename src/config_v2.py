@@ -47,10 +47,13 @@ FEATURE_GROUPS = {
     "derivatives_microstructure_features": [
         # Open Interest & Positioning
         #"open_interest_usd",
-        "oi_pct_change_1d",
-        "oi_pct_change_7d",
+        #"oi_pct_change_1d",
+        #"oi_pct_change_7d",
+        "oi_pct_change_1d_pct_90d",
+        "oi_pct_change_7d_pct_90d",
         "long_short_ratio",
-        "ls_ratio_zscore_14d",
+        #"ls_ratio_zscore_90d",
+        "ls_ratio_percentile_90d",
         "taker_buy_sell_ratio",
         
         # Funding Dynamics
@@ -99,7 +102,8 @@ FEATURE_GROUPS = {
         "dvol_daily_diff",        # 1-day DVOL difference
         "iv_rv_spread",           # Volatility Risk Premium: (dvol_close / 100) - rv_1m_daily
         "dvol_rv_ratio",          # Volatility Ratio: (dvol_close / 100) / (rv_1m_daily + 1e-8)
-        "dvol_zscore_14d",        # 14-day DVOL Z-Score
+        #"dvol_zscore_14d",       # 14-day DVOL Z-Score
+        "dvol_percentile_90d",     # 90-day DVOL rolling percentile rank,
     
         # ---------------------------------------------------------------------
         # 4. Technical Momentum & Trend Indicators (Binance Daily OHLCV)

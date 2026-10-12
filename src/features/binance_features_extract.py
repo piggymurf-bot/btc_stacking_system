@@ -176,10 +176,23 @@ def extract_daily_metrics_features(metrics_dir: str) -> pd.DataFrame:
     # Stationary derivatives
     df_metrics['oi_pct_change_1d'] = df_metrics['open_interest_usd'].pct_change()
     df_metrics['oi_pct_change_7d'] = df_metrics['open_interest_usd'].pct_change(7)
+    
+    # Option: 90-day rolling percentile rank for Open Interest changes
+    df_metrics['oi_pct_change_1d_pct_90d'] = (
+        df_metrics['oi_pct_change_1d'].rolling(90, min_periods=30).rank(pct=True)
+    )
+    df_metrics['oi_pct_change_7d_pct_90d'] = (
+        df_metrics['oi_pct_change_7d'].rolling(90, min_periods=30).rank(pct=True)
+    )
 
-    ls_mean = df_metrics['long_short_ratio'].rolling(14, min_periods=1).mean()
-    ls_std = df_metrics['long_short_ratio'].rolling(14, min_periods=1).std()
-    df_metrics['ls_ratio_zscore_14d'] = (df_metrics['long_short_ratio'] - ls_mean) / (ls_std + 1e-8)
+    ls_mean = df_metrics['long_short_ratio'].rolling(90, min_periods=30).mean()
+    ls_std = df_metrics['long_short_ratio'].rolling(90, min_periods=30).std()
+    df_metrics['ls_ratio_zscore_90d'] = (df_metrics['long_short_ratio'] - ls_mean) / (ls_std + 1e-8)
+
+    # Calculates where today's long/short ratio ranks relative to the last 90 days (expressed from 0.0 to 1.0)
+    df_metrics['ls_ratio_percentile_90d'] = (
+        df_metrics['long_short_ratio'].rolling(90, min_periods=30).rank(pct=True)
+    )
 
     return df_metrics
 

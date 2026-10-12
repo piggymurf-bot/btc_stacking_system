@@ -29,6 +29,10 @@ def extract_dvol_daily_features(parquet_path: str) -> pd.DataFrame:
     rolling_std = df_daily["dvol_close"].rolling(14, min_periods=1).std()
     df_daily["dvol_zscore_14d"] = (df_daily["dvol_close"] - rolling_mean) / (rolling_std + 1e-8)
 
+    df_daily['dvol_percentile_90d'] = (
+        df_daily['dvol_close'].rolling(90, min_periods=30).rank(pct=True)
+    )
+
     os.makedirs(PROCESSED_DIR, exist_ok=True)
     out_path = os.path.join(PROCESSED_DIR, "deribit_dvol_features.csv")
     df_daily.to_csv(out_path, index=False)
