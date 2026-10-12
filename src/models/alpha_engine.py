@@ -1,4 +1,5 @@
 import os
+import joblib
 import numpy as np
 import pandas as pd
 import lightgbm as lgb
@@ -12,6 +13,8 @@ ONCHAIN_FEATURES = FEATURE_GROUPS["onchain_features"]
 
 def train_alpha_model(
     data_path: str = "data/processed/master_feature_addlhar_alpha.csv",
+    output_model_path: str = "models/",
+    output_path: str = "data/processed",
     target_col: str = "target_fwd_cum_ret_1d"
 ):
     """
@@ -102,6 +105,14 @@ def train_alpha_model(
             eval_y = y_val,
             callbacks=[lgb.early_stopping(stopping_rounds=50, verbose=False)]
         )
+        
+        # Save individual fold artifacts (just the model and feature list)
+        fold_artifact = {
+            "model": model,
+            "features": available_features
+        }
+        artifact_path = os.path.join(output_model_path, f"fold_{fold+1}_alpha.pkl")
+        joblib.dump(fold_artifact, artifact_path)
 
         # Predict on validation fold
         preds = model.predict(X_val)
@@ -128,11 +139,19 @@ def train_alpha_model(
         "importance": model.feature_importances_
     }).sort_values(by="importance", ascending=False)
 
-    print("\nTop 5 Most Predictive On-Chain Features for 1-Day Return:")
+    print("\nTop 10 Most Predictive On-Chain Features for 1-Day Return:")
     print(importance_df.head(10).to_string(index=False))
-
+        
+    # Save OOF for backtest
+    oof_df = pd.DataFrame(
+        data=oof_preds, 
+        columns=['oof_alpha_preds']
+    )
+    oof_path = os.path.join(output_path, 'oof_alpha.csv')
+    oof_df.to_csv(oof_path, index=True)
+    
     # Save optimal d for processing daily dataset 
-    d_opt_path = os.path.join('data/processed', 'optimal_d_alpha.csv')
+    d_opt_path = os.path.join(output_path, 'optimal_d_alpha.csv')
     d_opt_df.to_csv(d_opt_path, index=True)
     
     return model, importance_df

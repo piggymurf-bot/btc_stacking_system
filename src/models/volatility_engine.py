@@ -1,4 +1,5 @@
 import os
+import joblib
 import numpy as np
 import pandas as pd
 import lightgbm as lgb
@@ -13,6 +14,8 @@ TECHNICALS_VOL_FEATURES = FEATURE_GROUPS["technicals_and_volatility_features"]
 
 def train_volatility_model(
     data_path: str = "data/processed/master_feature_addlhar_alpha.csv",
+    output_model_path: str = "models/",
+    output_path: str = "data/processed",
     target_col: str = "target_rv"
 ):
     """
@@ -103,6 +106,14 @@ def train_volatility_model(
             callbacks=[lgb.early_stopping(stopping_rounds=50, verbose=False)]
         )
 
+         # Save individual fold artifacts (just the model and feature list)
+        fold_artifact = {
+             "model": model,
+             "features": available_features
+        }
+        artifact_path = os.path.join(output_model_path, f"fold_{fold+1}_volat.pkl")
+        joblib.dump(fold_artifact, artifact_path)
+
         # Predict on validation fold
         preds = model.predict(X_val)
         oof_preds[val_idx] = preds
@@ -130,6 +141,15 @@ def train_volatility_model(
 
     print("\nTop 10 Most Predictive Volatility Features:")
     print(importance_df.head(10).to_string(index=False))
+        
+    # Save OOF for backtest
+    # Save OOF for backtest
+    oof_df = pd.DataFrame(
+        data=oof_preds, 
+        columns=['oof_volat_preds']
+    )
+    oof_path = os.path.join(output_path, 'oof_volat.csv')
+    oof_df.to_csv(oof_path, index=True)
     
     # Save optimal d for processing daily dataset 
     d_opt_path = os.path.join('data/processed', 'optimal_d_volat.csv')
