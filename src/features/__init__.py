@@ -142,32 +142,6 @@ def process_and_merge_csvs_v2(raw_dir: str = 'data/raw', raw_parquet_dir: str = 
     # Dropping multiple columns at once
     master_df = master_df.drop(columns=['timestamp', 'datetime'])
     
-    # List of cumulative non-stationary features to transform
-    #non_stationary_cols = [ 'aviv', 'mvrv', 'nupl', 'nrplbtc_log', 'close']
-    
-    # Assign the DataFrame to collect optimum d
-    #d_opt_df = pd.DataFrame(columns=non_stationary_cols,index=range(1))
-    
-    #for col in non_stationary_cols:
-            
-        # 1. Take log of price/index if not already logged (stabilizes variance)
-    #    series_to_diff = (
-    #            np.log(master_df[col]) if col == 'close' or (master_df[col] > 0).all() else master_df[col]
-    #            )
-
-        # 2. Find minimum d* that passes ADF test (stationarity)
-    #    optimal_d = find_optimal_d(series_to_diff, p_thres=0.05)
-
-        # 3. Apply FFD using optimal d*
-    #    master_df[f'{col}_fracdiff'] = frac_diff_ffd(series_to_diff, d=optimal_d)
-                
-        # 4. Collect the optimal d* for each column
-    #    d_opt_df[f'{col}'] = optimal_d
-
-    # Save optimal d for processing daily dataset 
-    #d_opt_path = os.path.join(out_dir, 'optimal_d_v2.csv')
-    #d_opt_df.to_csv(d_opt_path, index=True)
-            
     # Save merged dataset
     master_path = os.path.join(out_dir, 'master_feature_matrix.csv')
     master_df.to_csv(master_path, index=True)

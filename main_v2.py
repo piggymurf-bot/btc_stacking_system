@@ -9,9 +9,14 @@ from src.data.merge_raw_collected import merge_raw_to_collected
 from src.features import process_and_merge_csvs_v2
 #from src.features.check_features import check_missing_features
 from src.models.alpha_engine import train_alpha_model
-from src.models.alpha_ridge_baseline import train_alpha_model_ridge
 from src.models.volatility_engine import train_volatility_model
-#from src.backtest.engine import run_backtest_pipeline
+from src.backtest.backtest_engine_v2 import run_backtest_pipeline
+
+from src.models.holdout_alpha import run_holdout_evaluation_alpha
+from src.models.holdout_volat import run_holdout_evaluation_volat
+from src.models.feature_analyze_alpha import analyze_fold_feature_importance_alpha
+from src.models.feature_analyze_volat import analyze_fold_feature_importance_volat
+from src.models.alpha_wfo import run_walk_forward_optimization
 
 # 1. Load API keys from environment file
 load_dotenv('token.env')
@@ -41,13 +46,18 @@ def main():
   parser.add_argument(
       '--train',
       action='store_true',
-      help='Check for missing features',
+      help='Train alpha and volatility engines',
   )
-#  parser.add_argument(
-#      "--backtest",
-#      action="store_true",
-#      help="Run vectorized backtest on holdout predictions",
-#  )
+  parser.add_argument(
+      "--backtest",
+      action="store_true",
+      help="Run vectorized backtest on holdout predictions",
+  )
+  parser.add_argument(
+      "--test-ground",
+      action="store_true",
+      help="Train but holdout some dataset for backtest instead of OOF",
+  )
 #  parser.add_argument(
 #      "--all",
 #      action="store_true",
@@ -94,12 +104,21 @@ def main():
     #train_alpha_model_ridge()
     train_volatility_model()
    
-  #if args.backtest:
-  #  print('--> Executing Backtesting Engine...')  
+  if args.backtest:
+    print('--> Executing Backtesting Engine...')  
   #  #print(f"Executing Backtesting Engine (Threshold: {args.threshold})...")
   #  # args.threshold is passed directly here into the engine
-  #  run_backtest_pipeline(long_threshold=args.threshold)
+    run_backtest_pipeline()
+    
+  if args.test_ground:
+    print('--> Training Alpha and Volatility engines...')
+    #run_holdout_evaluation_alpha()
+    #run_holdout_evaluation_volat()
+    #analyze_fold_feature_importance_alpha()
+    #analyze_fold_feature_importance_volat()
+    run_walk_forward_optimization()
   
+    
     
 if __name__ == '__main__':
   main()

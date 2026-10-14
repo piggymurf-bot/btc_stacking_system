@@ -15,7 +15,7 @@ def train_alpha_model(
     data_path: str = "data/processed/master_feature_addlhar_alpha.csv",
     output_model_path: str = "models/",
     output_path: str = "data/processed",
-    target_col: str = "target_fwd_cum_ret_1d"
+    target_col: str = "target_fwd_sharpe_7d"
 ):
     """
     Trains a LightGBM Regressor on Group 1 On-Chain Features using Walk-Forward TimeSeriesSplit.
