@@ -9,17 +9,18 @@ from src.config_v2 import FEATURE_GROUPS
 
 ONCHAIN_FEATURES = FEATURE_GROUPS["onchain_features"]
 
-def run_walk_forward_optimization(
+def run_alpha_walk_forward_optimization(
     data_path: str = "data/processed/master_feature_addlhar_alpha.csv",
     target_col: str = "target_fwd_cum_ret_14d",
-    train_window_years: int = 3,
-    test_window_months: int = 6
+    target_col_bin: str = "target_fwd_dir_14d", 
+    train_window_years: int = 1,
+    test_window_months: int = 3
 ):
     print(f"📥 Loading dataset from {data_path}...")
     df = pd.read_csv(data_path)
     df["date"] = pd.to_datetime(df["date"])
     df = df.sort_values("date").reset_index(drop=True)
-    
+        
     feature_cols = [
         col for col in df.columns 
         if any(col.startswith(prefix) for prefix in ONCHAIN_FEATURES)
@@ -31,7 +32,7 @@ def run_walk_forward_optimization(
     cleaned_feature_cols = [re.sub(r'[^a-zA-Z0-9_]', '_', col) for col in feature_cols]
     
     # Assign cleaned names to the dataframe slices for this run
-    df_clean = df.dropna(subset=[target_col]).reset_index(drop=True)
+    df_clean = df.dropna(subset=[target_col, target_col_bin] + cleaned_feature_cols).reset_index(drop=True)
     df_clean = df_clean.rename(columns=dict(zip(feature_cols, cleaned_feature_cols)))
     feature_cols = cleaned_feature_cols
     # -----------------------------------------------------------------------------
@@ -68,8 +69,8 @@ def run_walk_forward_optimization(
         if len(test_slice) < 30: # Skip tiny trailing fragments
             break
             
-        X_train, y_train = train_slice[feature_cols], train_slice[target_col]
-        X_test, y_test = test_slice[feature_cols], test_slice[target_col]
+        X_train, y_train, y_train_b = train_slice[feature_cols], train_slice[target_col], train_slice[target_col_bin]
+        X_test, y_test, y_test_b = test_slice[feature_cols], test_slice[target_col], test_slice[target_col_bin]
         
         # Inside your WFO loop, right after getting test_slice:
         print(f"\n--- DIAGNOSTIC FOR FOLD {fold_idx} ({test_slice['date'].min().date()} to {test_slice['date'].max().date()}) ---")
@@ -106,27 +107,49 @@ def run_walk_forward_optimization(
             "verbose": -1
         }
         
-        model = lgb.LGBMRegressor(**params)
-        model.fit(
+        # Train Base Classifier (Manitude Alpha)
+        reg_model = lgb.LGBMRegressor(**params)
+        reg_model.fit(
             X_train, y_train,
             eval_X = X_test,
             eval_y = y_test,
             callbacks=[lgb.early_stopping(stopping_rounds=50, verbose=False)]
         )
         
-        preds = model.predict(X_test)
+        preds_reg = reg_model.predict(X_test)
         
-        # Store results for this fold
+        
+        # Train Base Classifier (Direction Probability)
+        clf_model = lgb.LGBMClassifier(n_estimators=100, learning_rate=0.03, random_state=42, verbose=-1)
+        clf_model.fit(X_train, y_train_b)
+        preds_prob = clf_model.predict_proba(X_test)[:, 1] # Probability of class 1 (Up)
+            
+        # --- ROBUST EVALUATION BLOCK ---
+        clean_preds = np.asarray(preds_reg, dtype=float)
+        clean_y = np.asarray(y_test, dtype=float)
+        
+        # Drop any NaN pairs
+        valid_mask = ~(np.isnan(clean_preds) | np.isnan(clean_y))
+        clean_preds = clean_preds[valid_mask]
+        clean_y = clean_y[valid_mask]
+        
+        # Check for empty arrays, zero variance, or constant predictions
+        if len(clean_preds) < 2 or np.all(clean_preds == clean_preds[0]) or np.all(clean_y == clean_y[0]):
+            ic = 0.0
+        else:
+            res = spearmanr(clean_preds, clean_y)
+            ic = res.correlation if not np.isnan(res.correlation) else 0.0
+        # -------------------------------
+        
+        # Store results for this fold using the safe 'ic' value
         fold_results = pd.DataFrame({
-            "date": test_slice["date"],
-            "y_true": y_test,
-            "y_pred": preds,
+            "date": test_slice["date"].iloc[valid_mask] if len(valid_mask) == len(test_slice) else test_slice["date"],
+            "y_true": clean_y,
+            "y_pred": clean_preds,
             "fold": fold_idx
         })
         all_oos_preds.append(fold_results)
         
-        # Evaluate fold metrics
-        ic, _ = spearmanr(preds, y_test)
         print(f"--- WFO Fold {fold_idx} ({test_slice['date'].min().date()} to {test_slice['date'].max().date()}) ---")
         print(f"📊 Out-of-Sample Spearman IC: {ic:.4f}")
         
@@ -137,7 +160,7 @@ def run_walk_forward_optimization(
     # Stitch all out-of-sample predictions together
     master_oos_df = pd.concat(all_oos_preds, ignore_index=True)
     os.makedirs("data/processed", exist_ok=True)
-    output_file = "data/processed/wfo_out_of_sample_predictions.csv"
+    output_file = "data/processed/alpha_wfo_out_of_sample_predictions.csv"
     master_oos_df.to_csv(output_file, index=False)
     
     # Calculate overall stitched metrics
@@ -153,7 +176,7 @@ def run_walk_forward_optimization(
     
     # --- LEAK DIAGNOSTIC SNIPPET ---
     # 1. Check Feature Importances: Does a single feature have 99% importance?
-    importances = model.feature_importances_
+    importances = reg_model.feature_importances_
     top_feature_idx = importances.argsort()[-1]
     print(f"🚨 Top Feature driving 0.99 IC: {feature_cols[top_feature_idx]} (Importance: {importances[top_feature_idx]})")
 
@@ -164,4 +187,4 @@ def run_walk_forward_optimization(
     #---------------------------------
 
 if __name__ == "__main__":
-    run_walk_forward_optimization()
+    run_alpha_walk_forward_optimization()

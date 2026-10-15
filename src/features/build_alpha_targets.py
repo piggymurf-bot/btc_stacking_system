@@ -20,15 +20,15 @@ def compute_forward_alpha_targets(
     """
     df = df.copy()
     
-    # 1. Compute 1-day log returns if not present
-    if price_return_col and price_return_col in df.columns:
-        ret_1d = df[price_return_col]
-    else:
-        ret_1d = np.log(df[close_col] / df[close_col].shift(1))
-        df["log_ret_1d"] = ret_1d
+    # 1. Compute 1-day log returns 
+    ret_1d = np.log(df[close_col] / df[close_col].shift(1))
+    df["log_ret_1d"] = ret_1d
 
     # Shift log returns by -1 so row 't' contains the return realised over t -> t+1
     fwd_ret_1d = ret_1d.shift(-1)
+    
+    fwd_vol_daily = fwd_ret_1d.iloc[::-1].rolling(window=14, min_periods=14).std().iloc[::-1]
+    df['target_rv_14d'] = fwd_vol_daily * ANN_FACTOR
 
     # 2. Compute multi-horizon targets
     for h in horizons:
@@ -55,6 +55,9 @@ def compute_forward_alpha_targets(
         df[f'target_fwd_cum_ret_{h}d'] = fwd_cum_ret
         df[f'target_fwd_vol_ann_{h}d'] = fwd_vol_ann
         df[f'target_fwd_sharpe_{h}d'] = fwd_sharpe
+        
+        # --- ADDING THE BINARY DIRECTION TARGET ---
+        df[f'target_fwd_dir_{h}d'] = (fwd_cum_ret > 0).astype(int)
     
     # 3. Interplay parameters between volatility and alpha signal
     df["iv_rv_spread"] = (df["dvol_close"] / 100) - df["rv_1m_daily"]

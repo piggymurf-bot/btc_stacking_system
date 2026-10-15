@@ -16,7 +16,10 @@ from src.models.holdout_alpha import run_holdout_evaluation_alpha
 from src.models.holdout_volat import run_holdout_evaluation_volat
 from src.models.feature_analyze_alpha import analyze_fold_feature_importance_alpha
 from src.models.feature_analyze_volat import analyze_fold_feature_importance_volat
-from src.models.alpha_wfo import run_walk_forward_optimization
+from src.models.alpha_wfo import run_alpha_walk_forward_optimization
+from src.models.volatility_wfo import run_volat_walk_forward_optimization
+from src.models.alpha_wfo_stack import run_alpha_stack_walk_forward_optimization
+
 
 # 1. Load API keys from environment file
 load_dotenv('token.env')
@@ -116,8 +119,9 @@ def main():
     #run_holdout_evaluation_volat()
     #analyze_fold_feature_importance_alpha()
     #analyze_fold_feature_importance_volat()
-    run_walk_forward_optimization()
-  
+    #run_alpha_walk_forward_optimization()
+    #run_volat_walk_forward_optimization()
+    run_alpha_stack_walk_forward_optimization()
     
     
 if __name__ == '__main__':
