@@ -17,6 +17,7 @@ def run_alpha_walk_forward_optimization(
     test_window_months: int = 3
 ):
     print(f"📥 Loading dataset from {data_path}...")
+    print("Begin the alpha engine walking-forward training...")
     df = pd.read_csv(data_path)
     df["date"] = pd.to_datetime(df["date"])
     df = df.sort_values("date").reset_index(drop=True)

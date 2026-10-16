@@ -13,10 +13,11 @@ TECHNICALS_VOL_FEATURES = FEATURE_GROUPS["technicals_and_volatility_features"]
 def run_volat_walk_forward_optimization(
     data_path: str = "data/processed/master_feature_addlhar_alpha.csv",
     target_col: str = "target_rv_14d",
-    train_window_years: int = 1,
+    train_window_years: int = 2,
     test_window_months: int = 3
 ):
     print(f"📥 Loading dataset from {data_path}...")
+    print("Begin the volatility engine walking-forward training...")
     df = pd.read_csv(data_path)
     df["date"] = pd.to_datetime(df["date"])
     df = df.sort_values("date").reset_index(drop=True)

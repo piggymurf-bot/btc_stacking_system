@@ -19,7 +19,11 @@ from src.models.feature_analyze_volat import analyze_fold_feature_importance_vol
 from src.models.alpha_wfo import run_alpha_walk_forward_optimization
 from src.models.volatility_wfo import run_volat_walk_forward_optimization
 from src.models.alpha_wfo_stack import run_alpha_stack_walk_forward_optimization
+from src.backtest.backtest_wf_engine import run_backtest_walk_forward
 
+## Temporary usage
+from src.data.binance_ingestion_engine import run_binance_parquet_ingestion_pipeline
+from src.data.deribit_dvol_loader import fetch_and_store_daily_dvol_parquet
 
 # 1. Load API keys from environment file
 load_dotenv('token.env')
@@ -31,11 +35,11 @@ def main():
   parser = argparse.ArgumentParser(
       description='BTC Stacking Quantitative Trading System'
   )
-#  parser.add_argument(
-#      '--download-data',
-#      action='store_true',
-#      help='Fetch and update raw dataset from APIs',
-#  )
+  parser.add_argument(
+      '--download-data',
+      action='store_true',
+      help='Fetch and update raw dataset from APIs',
+  )
   parser.add_argument(
       '--merge-data',
       action='store_true',
@@ -87,12 +91,14 @@ def main():
   #  sys.exit(1)
 
   # 3. Route execution based on CLI flag
-  #if args.download_data:
+  if args.download_data:
   #  if not API_TOKEN:
   #    raise ValueError('API Token missing! Check your token.env file.')
   #  print('--> Triggering Data Ingestion Pipeline...')
   #  run_full_data_pipeline(api_token=API_TOKEN, symbol='BTCUSDT')
-
+    run_binance_parquet_ingestion_pipeline()
+    fetch_and_store_daily_dvol_parquet()
+    
   if args.merge_data:
     print('--> Merging fetched data to collected data...')
     merge_raw_to_collected()
@@ -111,7 +117,8 @@ def main():
     print('--> Executing Backtesting Engine...')  
   #  #print(f"Executing Backtesting Engine (Threshold: {args.threshold})...")
   #  # args.threshold is passed directly here into the engine
-    run_backtest_pipeline()
+    #run_backtest_pipeline()
+    run_backtest_walk_forward()
     
   if args.test_ground:
     print('--> Training Alpha and Volatility engines...')
@@ -119,9 +126,9 @@ def main():
     #run_holdout_evaluation_volat()
     #analyze_fold_feature_importance_alpha()
     #analyze_fold_feature_importance_volat()
-    #run_alpha_walk_forward_optimization()
-    #run_volat_walk_forward_optimization()
-    run_alpha_stack_walk_forward_optimization()
+    run_alpha_walk_forward_optimization()
+    run_volat_walk_forward_optimization()
+    #run_alpha_stack_walk_forward_optimization()
     
     
 if __name__ == '__main__':
