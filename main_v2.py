@@ -19,7 +19,7 @@ from src.models.feature_analyze_volat import analyze_fold_feature_importance_vol
 from src.models.alpha_wfo import run_alpha_walk_forward_optimization
 from src.models.volatility_wfo import run_volat_walk_forward_optimization
 from src.models.alpha_wfo_stack import run_alpha_stack_walk_forward_optimization
-from src.backtest.backtest_wf_engine import run_backtest_walk_forward
+from src.backtest.backtest_wf_engine import run_backtest_walk_forward, run_backtest_with_sltp, run_backtest_with_rolling_quantiles, run_rolling_grid_search
 
 ## Temporary usage
 from src.data.binance_ingestion_engine import run_binance_parquet_ingestion_pipeline
@@ -118,7 +118,10 @@ def main():
   #  #print(f"Executing Backtesting Engine (Threshold: {args.threshold})...")
   #  # args.threshold is passed directly here into the engine
     #run_backtest_pipeline()
-    run_backtest_walk_forward()
+    #run_backtest_walk_forward()
+    run_backtest_with_sltp()
+    #run_backtest_with_rolling_quantiles()
+    #run_rolling_grid_search()
     
   if args.test_ground:
     print('--> Training Alpha and Volatility engines...')
