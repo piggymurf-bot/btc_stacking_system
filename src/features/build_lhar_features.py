@@ -49,6 +49,14 @@ def build_lhar_features(
     # Weekly Asymmetry Ratio (7-day rolling view - smoother macro trend)
     df["rv_asymmetry_ratio_w"] = np.log((df["rv_pos_w"] + 1e-8) / (df["rv_neg_w"] + 1e-8))
 
+    # Volatility Term Structure Slope (Short vs Long RV)
+    df["vol_term_structure"] = (df["rv_d"] + 1e-8) / (df["rv_m"] + 1e-8)
+    
+    # Volatility Compression / Expansion Flag (Z-scored 7d vs 30d)
+    rv_d_mean_30 = df["rv_d"].rolling(30).mean()
+    rv_d_std_30 = df["rv_d"].rolling(30).std()
+    df["vol_zscore_30d"] = (df["rv_d"] - rv_d_mean_30) / (rv_d_std_30 + 1e-8)
+
     return df
 
 def add_lhar_main(

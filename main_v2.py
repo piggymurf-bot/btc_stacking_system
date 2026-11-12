@@ -8,18 +8,9 @@ from dotenv import load_dotenv
 from src.data.merge_raw_collected import merge_raw_to_collected
 from src.features import process_and_merge_csvs_v2
 #from src.features.check_features import check_missing_features
-from src.models.alpha_engine import train_alpha_model
-from src.models.volatility_engine import train_volatility_model
-from src.backtest.backtest_engine_v2 import run_backtest_pipeline
+from src.models.v2_alpha_engine import run_alpha_pipeline
+from src.models.v2_volatility_engine import run_volat_pipeline
 
-from src.models.holdout_alpha import run_holdout_evaluation_alpha
-from src.models.holdout_volat import run_holdout_evaluation_volat
-from src.models.feature_analyze_alpha import analyze_fold_feature_importance_alpha
-from src.models.feature_analyze_volat import analyze_fold_feature_importance_volat
-from src.models.alpha_wfo import run_alpha_walk_forward_optimization
-from src.models.volatility_wfo import run_volat_walk_forward_optimization
-from src.models.alpha_wfo_stack import run_alpha_stack_walk_forward_optimization
-from src.backtest.backtest_wf_engine import run_backtest_walk_forward, run_backtest_with_sltp, run_backtest_with_rolling_quantiles, run_rolling_grid_search
 
 ## Temporary usage
 from src.data.binance_ingestion_engine import run_binance_parquet_ingestion_pipeline
@@ -109,29 +100,16 @@ def main():
     
   if args.train:
     print('--> Training Alpha and Volatility engines...')
-    train_alpha_model()
-    #train_alpha_model_ridge()
-    train_volatility_model()
+  # run_alpha_pipeline()
+    run_volat_pipeline()
    
   if args.backtest:
     print('--> Executing Backtesting Engine...')  
   #  #print(f"Executing Backtesting Engine (Threshold: {args.threshold})...")
   #  # args.threshold is passed directly here into the engine
-    #run_backtest_pipeline()
-    #run_backtest_walk_forward()
-    run_backtest_with_sltp()
-    #run_backtest_with_rolling_quantiles()
-    #run_rolling_grid_search()
     
   if args.test_ground:
     print('--> Training Alpha and Volatility engines...')
-    #run_holdout_evaluation_alpha()
-    #run_holdout_evaluation_volat()
-    #analyze_fold_feature_importance_alpha()
-    #analyze_fold_feature_importance_volat()
-    run_alpha_walk_forward_optimization()
-    run_volat_walk_forward_optimization()
-    #run_alpha_stack_walk_forward_optimization()
     
     
 if __name__ == '__main__':

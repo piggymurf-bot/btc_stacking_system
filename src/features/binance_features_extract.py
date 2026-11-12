@@ -92,6 +92,7 @@ def compute_multi_day_technicals(df_daily: pd.DataFrame) -> pd.DataFrame:
     # 4. Distance Ratios
     df_daily["sma7_to_sma50_ratio"] = sma7 / (sma50 + 1e-8)
     df_daily["dist_from_sma20"] = (close - sma20) / (sma20 + 1e-8)
+    df_daily["sma200"] = sma200
     df_daily["dist_from_sma200"] = (close - sma200) / (sma200 + 1e-8)
 
     # 5. Bollinger %B
@@ -254,6 +255,20 @@ def run_binance_feature_extraction(
         df_merged = df_merged.merge(df_funding, on="date", how="left")
     if not df_depth.empty:
         df_merged = df_merged.merge(df_depth, on="date", how="left")
+
+        
+    # Establish a clean macro trend state (1.0 if above 200-day SMA, -1.0 if below)
+    macro_trend_state = np.where(df_merged["close"] > df_merged["sma200"], 1.0, -1.0)
+    
+    # Condition raw tactical derivatives against the macro trend state 
+    # (Forces the model to differentiate leverage behavior in bull vs bear regimes)
+    if 'funding_rate_daily_sum' in df_merged.columns:
+        df_merged['funding_rate_conditioned'] = df_merged['funding_rate_daily_sum'] * macro_trend_state
+        
+    if 'oi_pct_change_7d' in df_merged.columns:
+        df_merged['oi_growth_x_trend'] = df_merged['oi_pct_change_7d'] * macro_trend_state
+
+    # =========================================================================
 
     os.makedirs(PROCESSED_DIR, exist_ok=True)
     out_path = os.path.join(PROCESSED_DIR, "binance_unified_features.csv")

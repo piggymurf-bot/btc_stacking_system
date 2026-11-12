@@ -67,6 +67,10 @@ FEATURE_GROUPS = {
         #"book_depth_1m_mean",
         "depth_ratio_30d",
         "bid_ask_depth_ratio",
+        
+        #regime condition
+        "funding_rate_conditioned",
+        "oi_growth_x_trend",
     ],
     
     # -------------------------------------------------------------------------
@@ -103,7 +107,7 @@ FEATURE_GROUPS = {
         "iv_rv_spread",           # Volatility Risk Premium: (dvol_close / 100) - rv_1m_daily
         "dvol_rv_ratio",          # Volatility Ratio: (dvol_close / 100) / (rv_1m_daily + 1e-8)
         #"dvol_zscore_14d",       # 14-day DVOL Z-Score
-        "dvol_percentile_90d",     # 90-day DVOL rolling percentile rank,
+        "dvol_percentile_90d",    # 90-day DVOL rolling percentile rank,
     
         # ---------------------------------------------------------------------
         # 4. Technical Momentum & Trend Indicators (Binance Daily OHLCV)

@@ -59,8 +59,33 @@ def run_bgeometrics_feature_extraction(bg_data: pd.DataFrame) -> pd.DataFrame:
     
         # Compute 1-day change on the percentage shares (Velocity / Migration)
         features_df[f"{share_col_name}_daily_diff"] = features_df[share_col_name].diff()
-
-
+       
+    # Base Macro Buckets (Levels)
+    features_df['macro_share_sth_under_6m'] = (
+        features_df.get('age_0d_1d_share', 0) + features_df.get('age_1d_1w_share', 0) + 
+        features_df.get('age_1w_1m_share', 0) + features_df.get('age_1m_3m_share', 0) + 
+        features_df.get('age_3m_6m_share', 0)
+    )
+    features_df['macro_share_mth_6m_1y'] = features_df.get('age_6m_1y_share', 0)
+    features_df['macro_share_lth_1y_3y'] = features_df.get('age_1y_2y_share', 0) + features_df.get('age_2y_3y_share', 0)
+    features_df['macro_share_dormant_3y_plus'] = (
+        features_df.get('age_3y_4y_share', 0) + features_df.get('age_4y_5y_share', 0) + 
+        features_df.get('age_5y_7y_share', 0) + features_df.get('age_7y_10y_share', 0) + 
+        features_df.get('age_10y_plus_share', 0)
+    )
+    
+    macro_buckets = [
+        'macro_share_sth_under_6m', 
+        'macro_share_mth_6m_1y', 
+        'macro_share_lth_1y_3y', 
+        'macro_share_dormant_3y_plus'
+    ]    
+    
+    horizons = [1, 3, 7, 14]
+    for bucket in macro_buckets:
+       for h_diff in horizons:
+           features_df[f'{bucket}_diff_{h_diff}d'] = features_df[bucket] - features_df[bucket].shift(h_diff)
+       
     #Dropout the first row since its day-to-day difference will be NaN
     features_df = features_df.dropna()
 
