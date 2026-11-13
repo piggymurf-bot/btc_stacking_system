@@ -33,8 +33,12 @@ def run_regime_stacked_serialized_pipeline(
     with mlflow.start_run(run_name=f"Serialized_Stacking_{target_col}"):
         print(f"🚀 Starting Serialized Regime-Stacked Pipeline for {target_col}...")
         
-        holdout_df = master_df.iloc[-holdout_size:].copy()
-        wfo_df = master_df.iloc[:-holdout_size].copy()
+        master_df_clean = master_df.dropna(subset=[target_col, 'close'] + feature_cols)
+        holdout_df = master_df_clean.iloc[-holdout_size:].copy()
+        wfo_df = master_df_clean.iloc[:-holdout_size].copy()
+        
+        # holdout_df = master_df.iloc[-holdout_size:].copy()
+        # wfo_df = master_df.iloc[:-holdout_size].copy()
         
         print(f"📊 Total Dataset Rows: {len(master_df)}")
         print(f"   - WFO Training/Validation Pool: {len(wfo_df)} rows")
