@@ -9,27 +9,29 @@ def run_volatility_scaled_backtest(
     fee_bps: float = 5.0              # 5 basis points per unit of turnover (fees + slippage)
 ):
     """
-    Loads the holdout backtest dataset, computes volatility-scaled position sizes,
-    deducts transaction costs, and compares net performance against Bitcoin buy-and-hold.
+    Loads the holdout backtest dataset, computes volatility-scaled position sizes
+    using rolling-centered alpha signals, deducts transaction costs, and compares 
+    net performance against Bitcoin buy-and-hold.
     """
     bt_df = pd.read_csv(backtest_csv_path, parse_dates=['date'], index_col='date')
     
     # 1. Underlying Daily Asset Returns
     bt_df['actual_return'] = bt_df['close'].pct_change(fill_method=None)
     
-    # 2. Base Directional Signal from Alpha Prediction (+1 for Long, 0 for Flat)
-    # You can also use -1 if you want to allow shorting: np.where(bt_df['pred_alpha'] > 0, 1.0, -1.0)
-    bt_df['raw_signal'] = np.where(bt_df['pred_alpha'] > 0, 1.0, 0.0)
+    # 2. Center Alpha Predictions via Rolling Mean to Enable True Long/Short Triggers
+    rolling_mean_alpha = bt_df['pred_alpha'].rolling(window=30, min_periods=1).mean()
+    bt_df['centered_alpha'] = bt_df['pred_alpha'] - rolling_mean_alpha
+    
+    # Raw signal: +1 if above rolling mean, -1 if below rolling mean
+    bt_df['raw_signal'] = np.where(bt_df['centered_alpha'] > 0, 1.0, -1.0)
     
     # 3. Volatility Targeting / Risk Parity Sizing
-    # Position scales inversely to predicted volatility: higher predicted vol -> smaller size
-    # Avoid division by zero by clipping pred_volat at a small positive floor (e.g., 0.05)
     safe_pred_vol = bt_df['pred_volat'].clip(lower=0.05)
     vol_scalar = target_annual_vol / safe_pred_vol
     
-    # Combine directional signal with volatility scaling and clip leverage
+    # Combine directional signal with volatility scaling and clip leverage for long/short
     bt_df['target_position'] = bt_df['raw_signal'] * vol_scalar
-    bt_df['target_position'] = bt_df['target_position'].clip(upper=max_leverage, lower=0.0) # Long-only constraint
+    bt_df['target_position'] = bt_df['target_position'].clip(upper=max_leverage, lower=-max_leverage)
     
     # 4. Shift position by 1 bar to prevent lookahead bias (executed on the next close)
     bt_df['position'] = bt_df['target_position'].shift(1).fillna(0)
@@ -59,24 +61,25 @@ def run_volatility_scaled_backtest(
     drawdown = (bt_df['cumulative_strategy'] - rolling_max) / rolling_max
     max_drawdown = drawdown.min()
     
-    total_net_net_str = f"{total_net_return * 100:.2f}%"
+    total_net_str = f"{total_net_return * 100:.2f}%"
     
     print("=" * 60)
-    print("📈 VOLATILITY-SCALED BACKTEST PERFORMANCE REPORT (NET)")
+    print("📈 VOLATILITY-SCALED BACKTEST PERFORMANCE REPORT (NET - CENTERED)")
     print("=" * 60)
-    print(f"Holdout Duration:             {total_days} bars")
-    print(f"Strategy Cumulative Net Return: {total_net_net_str} ({total_net_return * 100:.2f}%)")    
-    print(f"Benchmark (BTC Buy & Hold):     {total_market_return * 100:.2f}%")
-    print(f"Annualized Net Sharpe Ratio:    {net_sharpe:.2f}")
-    print(f"Maximum Drawdown:             {max_drawdown * 100:.2f}%")
-    print(f"Average Daily Turnover:       {bt_df['turnover'].mean() * 100:.2f}%")
+    print(f"Holdout Duration:              {total_days} bars")
+    print(f"Strategy Cumulative Net Return: {total_net_str} ({total_net_return * 100:.2f}%)")    
+    print(f"Benchmark (BTC Buy & Hold):      {total_market_return * 100:.2f}%")
+    print(f"Annualized Net Sharpe Ratio:     {net_sharpe:.2f}")
+    print(f"Maximum Drawdown:              {max_drawdown * 100:.2f}%")
+    print(f"Average Daily Turnover:        {bt_df['turnover'].mean() * 100:.2f}%")
+    print(f"Long / Short Ratio:            {(bt_df['position'] > 0).sum()} days Long / {(bt_df['position'] < 0).sum()} days Short")
     print("=" * 60)
     
     # 9. Plotting Results
     plt.figure(figsize=(11, 5))
-    plt.plot(bt_df.index, bt_df['cumulative_strategy'], label='Vol-Scaled Regime Strategy (Net)', color='dodgerblue', linewidth=2)
+    plt.plot(bt_df.index, bt_df['cumulative_strategy'], label='Vol-Scaled Centered Strategy (Net)', color='dodgerblue', linewidth=2)
     plt.plot(bt_df.index, bt_df['cumulative_market'], label='Bitcoin Buy & Hold', color='gray', linestyle='--', alpha=0.7)
-    plt.title('Holdout PnL: Volatility-Scaled Stacking Strategy vs. BTC Benchmark')
+    plt.title('Holdout PnL: Volatility-Scaled Centered Alpha Strategy vs. BTC Benchmark')
     plt.xlabel('Date')
     plt.ylabel('Portfolio Value ($1.00 Base)')
     plt.legend(loc='upper left')
