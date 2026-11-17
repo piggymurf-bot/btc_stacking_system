@@ -58,11 +58,7 @@ def compute_forward_alpha_targets(
         
         # --- ADDING THE BINARY DIRECTION TARGET ---
         df[f'target_fwd_dir_{h}d'] = (fwd_cum_ret > 0).astype(int)
-    
-    # 3. Interplay parameters between volatility and alpha signal
-    df["iv_rv_spread"] = (df["dvol_close"] / 100) - df["rv_1m_daily"]
-    df["dvol_rv_ratio"] = (df["dvol_close"] / 100)/( df["rv_1m_daily"] + 1e-8)
-    
+     
     return df
 
 

@@ -1,9 +1,9 @@
 import pandas as pd
 import numpy as np
 import os
-import lightgbm as lgb
+# import lightgbm as lgb
 import joblib
-from sklearn.linear_model import Ridge
+# from sklearn.linear_model import Ridge
 from scipy.stats import spearmanr
 
 from src.config_v2_mod import FEATURE_GROUPS
@@ -29,7 +29,8 @@ def holdout_df_generation(
     master_df = pd.read_csv(master_file, parse_dates=['date'], index_col='date')
     
     # --- 1. Evaluate Alpha Holdout (matching training slice logic) ---
-    alpha_clean = master_df.dropna(subset=[target_col_alpha, 'close'] + all_features)
+    # alpha_clean = master_df.dropna(subset=[target_col_alpha, 'close'] + all_features)
+    alpha_clean = master_df.dropna(subset=['close'] + all_features)
     holdout_alpha_df = alpha_clean.iloc[-holdout_size:].copy()
     
     # Compute regimes for alpha holdout
@@ -66,7 +67,8 @@ def holdout_df_generation(
     print("="*50)
     
     # --- 2. Evaluate Volatility Holdout (independent cleaning slice) ---
-    volat_clean = master_df.dropna(subset=[target_col_volat, 'close'] + all_features)
+    # volat_clean = master_df.dropna(subset=[target_col_volat, 'close'] + all_features)
+    volat_clean = master_df.dropna(subset=['close'] + all_features)
     holdout_volat_df = volat_clean.iloc[-holdout_size:].copy()
     
     regimes_volat = []

@@ -1,6 +1,4 @@
-import numpy as np
 import pandas as pd
-import os
 
 from src.config_v2_mod import FEATURE_GROUPS
 from src.models.v2_features_partition import profile_and_save_regime_features
@@ -20,7 +18,7 @@ def run_alpha_pipeline(
     
     master_df = pd.read_csv(master_file, parse_dates=['date'], index_col='date')
     master_df_clean = master_df.dropna(subset=[target_col, 'close'] + all_features)
-    holdout_df = master_df_clean.iloc[-holdout_size:].copy()
+    # holdout_df = master_df_clean.iloc[-holdout_size:].copy()
     wfo_df = master_df_clean.iloc[:-holdout_size].copy()
 
     profile_and_save_regime_features(

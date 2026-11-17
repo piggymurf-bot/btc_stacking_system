@@ -11,6 +11,7 @@ from src.features import process_and_merge_csvs_v2
 from src.models.v2_alpha_engine import run_alpha_pipeline
 from src.models.v2_volatility_engine import run_volat_pipeline
 from src.backtest.v2_holdout_gen import holdout_df_generation
+from src.backtest.v2_holdout_gen_live import holdout_df_generation_live
 from src.backtest.v2_backtest_engine import run_volatility_scaled_backtest
 
 ## Temporary usage
@@ -108,7 +109,7 @@ def main():
     print('--> Executing Backtesting Engine...')  
   #  #print(f"Executing Backtesting Engine (Threshold: {args.threshold})...")
   #  # args.threshold is passed directly here into the engine
-    holdout_df_generation()
+    holdout_df_generation_live()
     run_volatility_scaled_backtest()
     
   if args.test_ground:

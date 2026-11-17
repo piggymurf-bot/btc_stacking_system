@@ -57,6 +57,10 @@ def build_lhar_features(
     rv_d_std_30 = df["rv_d"].rolling(30).std()
     df["vol_zscore_30d"] = (df["rv_d"] - rv_d_mean_30) / (rv_d_std_30 + 1e-8)
 
+    # Interplay parameters between volatility and alpha signal
+    df["iv_rv_spread"] = (df["dvol_close"] / 100) - df["rv_1m_daily"]
+    df["dvol_rv_ratio"] = (df["dvol_close"] / 100)/( df["rv_1m_daily"] + 1e-8)
+
     return df
 
 def add_lhar_main(

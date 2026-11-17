@@ -102,7 +102,7 @@ def _download_and_save_metrics_parquet(date_str: str, symbol: str, session: requ
 
 
 def _download_and_save_funding_parquet(symbol: str, start_date_str: str, session: requests.Session):
-    """Downloads monthly funding rate archives and saves raw Parquet files to disk."""
+    """Downloads monthly funding rate archives and patches the current ongoing month via live REST API."""
     out_dir = os.path.join(RAW_PARQUET_DIR, "funding_rates")
     os.makedirs(out_dir, exist_ok=True)
 
@@ -112,10 +112,14 @@ def _download_and_save_funding_parquet(symbol: str, start_date_str: str, session
         year_month = dt.strftime('%Y-%m')
         parquet_path = os.path.join(out_dir, f"{symbol}-fundingRate-{year_month}.parquet")
 
-        if os.path.exists(parquet_path):
+        # Check if it's the current active month (which Binance Vision hasn't archived yet)
+        is_current_month = (year_month == pd.Timestamp.now().strftime('%Y-%m'))
+
+        if os.path.exists(parquet_path) and not is_current_month:
             continue
 
         url = f"{BASE_URL}/monthly/fundingRate/{symbol}/{symbol}-fundingRate-{year_month}.zip"
+        downloaded = False
         try:
             res = session.get(url, timeout=10)
             if res.status_code == 200:
@@ -125,8 +129,32 @@ def _download_and_save_funding_parquet(symbol: str, start_date_str: str, session
                         if 'calc_time' not in df_month.columns:
                             df_month.columns = ['calc_time', 'funding_interval_hours', 'last_funding_rate']
                         df_month.to_parquet(parquet_path, compression='snappy', index=False)
+                        downloaded = True
         except Exception:
             pass
+
+        # Fallback or Live Patch for the current ongoing month via Binance Futures Public REST API
+        if is_current_month and not downloaded:
+            print(f"🌐 Fetching live funding rate data for current month ({year_month}) via REST API...")
+            rest_url = "https://fapi.binance.com/fapi/v1/fundingRate"
+            params = {"symbol": symbol, "limit": 1000}
+            try:
+                res_live = session.get(rest_url, params=params, timeout=10)
+                if res_live.status_code == 200:
+                    live_data = res_live.json()
+                    if live_data:
+                        df_live = pd.DataFrame(live_data)
+                        # Normalize columns to match Binance Vision archive structure
+                        # Binance Vision has: calc_time, funding_interval_hours, last_funding_rate
+                        # Live REST returns: symbol, fundingTime, fundingRate, markPrice
+                        df_mapped = pd.DataFrame({
+                            'calc_time': df_live['fundingTime'],
+                            'funding_interval_hours': 8, # Standard perpetual interval
+                            'last_funding_rate': df_live['fundingRate'].astype(float)
+                        })
+                        df_mapped.to_parquet(parquet_path, compression='snappy', index=False)
+            except Exception as e:
+                print(f"⚠️ Failed to fetch live funding rate patch: {e}")
 
 
 def run_binance_parquet_ingestion_pipeline(
@@ -151,7 +179,7 @@ def run_binance_parquet_ingestion_pipeline(
         for _ in as_completed(futures_kline + futures_depth + futures_metrics):
             pass
 
-    # Monthly funding rates download
+    # Monthly funding rates download (with live REST patching for the current month)
     _download_and_save_funding_parquet(symbol, start_date_str, session)
 
     return None
