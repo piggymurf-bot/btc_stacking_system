@@ -13,7 +13,16 @@ from sklearn.linear_model import Ridge
 
 from src.models.v2_features_partition import determine_market_regime
 
-def objective(trial, wfo_df, feature_cols, target_col, profile_dir="data/regime_profiles"):
+def objective(trial, 
+              wfo_df, 
+              feature_cols, 
+              target_col, 
+              val_block_size: int = 120,
+              profile_dir: str = "data/regime_profiles",
+              std_penalty: float = 0.5,
+              neg_penalty: float = 0.5,
+              recency_blend: float = 0.3
+    ):
     
     # 1. Start a nested MLflow run for each individual Optuna trial
     with mlflow.start_run(nested=True):
@@ -42,8 +51,10 @@ def objective(trial, wfo_df, feature_cols, target_col, profile_dir="data/regime_
         mlflow.log_params(params)
         mlflow.log_param("meta_alpha", meta_alpha)
         mlflow.log_param("target_col", target_col)
+        mlflow.log_param("std_penalty", std_penalty)
+        mlflow.log_param("neg_penalty", neg_penalty)
+        mlflow.log_param("recency_blend", recency_blend)
         
-        val_block_size = 246
         total_rows = len(wfo_df)
         horizon = int(target_col.split('_')[-1].replace('d', ''))
 
@@ -60,10 +71,12 @@ def objective(trial, wfo_df, feature_cols, target_col, profile_dir="data/regime_
         
         oof_meta_preds = []
         oof_actuals = []
+        fold_ics = []
         
         # 3. WFO Fold Cross-Validation Loop
-        for fold_idx in range(1, 4):
-            train_end_idx = total_rows - (4 - fold_idx) * val_block_size - horizon
+        max_fold = 4
+        for fold_idx in range(1, max_fold):
+            train_end_idx = total_rows - (max_fold - fold_idx) * val_block_size - horizon
             val_start_idx = train_end_idx
             val_end_idx = min(val_start_idx + val_block_size, total_rows)
             
@@ -71,7 +84,7 @@ def objective(trial, wfo_df, feature_cols, target_col, profile_dir="data/regime_
             val_df = wfo_df.iloc[val_start_idx:val_end_idx].copy()
             
             if len(val_df) < 30:
-                mlflow.log_metric("aggregate_oof_ic", -999.0)
+                mlflow.log_metric("optuna_objective_ic", -999.0)
                 return -999.0
                 
             y_train = train_df[target_col]
@@ -113,15 +126,47 @@ def objective(trial, wfo_df, feature_cols, target_col, profile_dir="data/regime_
             meta_learner.fit(train_meta_X, y_train)
             
             meta_preds = meta_learner.predict(val_meta_X)
+
+            # Per-fold Spearman IC
+            fold_ic, _ = spearmanr(meta_preds, y_val.values)
+            if np.isnan(fold_ic):
+                mlflow.log_metric("optuna_objective_ic", -999.0)
+                return -999.0
+
+            fold_ics.append(float(fold_ic))
+            mlflow.log_metric(f"fold_{fold_idx}_ic", float(fold_ic))
+            
             oof_meta_preds.extend(meta_preds)
             oof_actuals.extend(y_val.values)
-            
+
+        fold_ics_arr = np.array(fold_ics, dtype=float)
+        n_folds = len(fold_ics_arr)
+
+        # Equal weights vs. linearly increasing recency weights (higher on later folds)
+        equal_weights = np.ones(n_folds) / n_folds
+        recency_weights = np.arange(1, n_folds + 1, dtype=float)
+        recency_weights /= recency_weights.sum()
+        blended_weights = (1.0 - recency_blend) * equal_weights + recency_blend * recency_weights
+
+        weighted_mean_ic = float(np.sum(blended_weights * fold_ics_arr))
+        std_ic = float(np.std(fold_ics_arr))
+
+        # Extra penalty for folds that flip negative (mean of shortfall below 0)
+        neg_shortfall = float(np.mean(np.maximum(0.0, -fold_ics_arr)))
+
+        consistency_score = weighted_mean_ic - (std_penalty * std_ic) - (neg_penalty * neg_shortfall)
+        final_score = consistency_score if not np.isnan(consistency_score) else -999.0
+
+        # Still log aggregate_oof_ic for side-by-side comparison in MLflow
         aggregate_ic, _ = spearmanr(oof_meta_preds, oof_actuals)
-        final_score = aggregate_ic if not np.isnan(aggregate_ic) else -999.0
-        
-        # Log the final evaluation metric to MLflow for this trial
-        mlflow.log_metric("aggregate_oof_ic", final_score)
-        
+        if not np.isnan(aggregate_ic):
+            mlflow.log_metric("aggregate_oof_ic", float(aggregate_ic))
+
+        mlflow.log_metric("weighted_mean_fold_ic", weighted_mean_ic)
+        mlflow.log_metric("std_fold_ic", std_ic)
+        mlflow.log_metric("neg_fold_shortfall", neg_shortfall)
+        mlflow.log_metric("optuna_objective_ic", final_score)
+
         return final_score
 
 # Execute Optuna Study for Alpha or Volatility Engine
@@ -151,6 +196,13 @@ def run_optuna_pipeline(
     print(f"🎲 Initializing Optuna Study with Seed: {run_seed}")
     sampler = TPESampler(seed=run_seed)
     
+
+    try:
+        optuna.delete_study(study_name=study_name, storage=db_path)
+        print("Previous study records successfully deleted!")
+    except KeyError:
+            print("Study did not exist yet.")
+    
     # Create study with dynamic persistent storage and study name
     study = optuna.create_study(
         study_name=study_name,
@@ -166,7 +218,7 @@ def run_optuna_pipeline(
         mlflow.log_param("study_name", study_name)
     
     study.optimize(
-        lambda trial: objective(trial, wfo_df, feature_cols, target_col, profile_dir), 
+        lambda trial: objective(trial, wfo_df, feature_cols, target_col, 60, profile_dir), 
         n_trials=n_trials, 
     )
     

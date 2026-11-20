@@ -19,7 +19,7 @@ def holdout_df_generation(
         feature_cols: list[str] = all_features, 
         target_col_alpha: str = "target_fwd_cum_ret_14d",
         target_col_volat: str = "target_rv_14d",
-        holdout_size: int = 150,
+        holdout_size: int = 600,
         profile_dir_alpha: str = "data/regime_profiles_alpha",
         profile_dir_volat: str = "data/regime_profiles_volat",
         artifact_dir_alpha: str = "models/regime_stacked_alpha_artifacts",
@@ -93,7 +93,9 @@ def holdout_df_generation(
         'actual_return': holdout_alpha_df['actual_return'],
         'market_regime': holdout_alpha_df['market_regime'],
         'pred_alpha': holdout_alpha_df['pred_alpha'],
-        'pred_volat': pd.Series(holdout_preds_volat, index=holdout_volat_df.index)
+        'pred_volat': pd.Series(holdout_preds_volat, index=holdout_volat_df.index),
+        'parkinson_vol': master_df['parkinson_vol'],
+        'garman_klass_vol': master_df['garman_klass_vol']
     }).dropna()
     
     # Print exact distribution to verify partitioning
@@ -118,7 +120,7 @@ if __name__ == '__main__':
             feature_cols = all_features, 
             target_col_alpha = "target_fwd_cum_ret_14d",
             target_col_volat = "target_rv_14d",
-            holdout_size = 150,
+            holdout_size = 600,
             profile_dir_alpha = "data/regime_profiles_alpha",
             profile_dir_volat = "data/regime_profiles_volat",
             artifact_dir_alpha = "models/regime_stacked_alpha_artifacts",

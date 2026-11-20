@@ -65,6 +65,7 @@ def compute_forward_alpha_targets(
 def process_alpha_targets(
     dir_path: str = "data/processed",
     matrix_file: str = "master_feature_addlhar.csv",
+    output_file: str = "master_feature_addlhar_alpha.csv",
     horizons: list = [1, 3, 7, 14]
     #horizons: list = [1]
 ):
@@ -89,7 +90,7 @@ def process_alpha_targets(
     df_clean = df_with_targets.iloc[:-max_h].copy()
 
     os.makedirs(os.path.dirname(dir_path), exist_ok=True)
-    df_path = os.path.join(dir_path, 'master_feature_addlhar_alpha.csv')
+    df_path = os.path.join(dir_path, output_file)
     df_clean.to_csv(df_path, index=False)
     
     print(f"✅ Generated {len(df_clean)} rows of alpha target matrix.")

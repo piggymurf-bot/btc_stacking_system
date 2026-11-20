@@ -17,8 +17,8 @@ def run_regime_stacked_serialized_pipeline(
     target_col: str, 
     lgb_params: dict,
     meta_alpha: float,
-    val_block_size: int = 246,
-    holdout_size: int = 150,
+    val_block_size: int = 120,
+    holdout_size: int = 600,
     profile_dir: str = "data/regime_profiles",
     artifact_dir: str = "models/regime_stacked_artifacts",
     experiment_name: str = "Bitcoin_Regime_Stacked_Serialized",
@@ -34,16 +34,20 @@ def run_regime_stacked_serialized_pipeline(
         print(f"🚀 Starting Serialized Regime-Stacked Pipeline for {target_col}...")
         
         master_df_clean = master_df.dropna(subset=[target_col, 'close'] + feature_cols)
-        holdout_df = master_df_clean.iloc[-holdout_size:].copy()
-        wfo_df = master_df_clean.iloc[:-holdout_size].copy()
         
-        # holdout_df = master_df.iloc[-holdout_size:].copy()
-        # wfo_df = master_df.iloc[:-holdout_size].copy()
-        
-        print(f"📊 Total Dataset Rows: {len(master_df)}")
-        print(f"   - WFO Training/Validation Pool: {len(wfo_df)} rows")
-        print(f"   - Isolated Holdout Set:         {len(holdout_df)} rows")
-
+        if holdout_size > 0:
+            holdout_df = master_df_clean.iloc[-holdout_size:].copy()
+            wfo_df = master_df_clean.iloc[:-holdout_size].copy()
+            
+            print(f"📊 Total Dataset Rows: {len(master_df)}")
+            print(f"   - WFO Training/Validation Pool: {len(wfo_df)} rows")
+            print(f"   - Isolated Holdout Set:         {len(holdout_df)} rows")
+        else:
+            wfo_df = master_df_clean.copy()
+            print(f"📊 Total Dataset Rows: {len(master_df)}")
+            print(f"   - WFO Training/Validation Pool: {len(wfo_df)} rows")
+            print("    - Isolated Holdout Set: None")
+                  
         regimes = []
         window = 14
         for i in range(len(wfo_df)):
@@ -69,13 +73,14 @@ def run_regime_stacked_serialized_pipeline(
         total_rows = len(wfo_df)
         regimes = ['clean_trend', 'high_vol_chop', 'mean_reverting_sideways']
         
-        # 1. Run WFO Folds
-        for fold_idx in range(1, 4):
+        # 1. Run WFO 
+        max_fold = 4
+        for fold_idx in range(1, max_fold):
             print("\n------------------------------------------------------------")
             print(f"   -> Processing WFO Fold {fold_idx}...")
             
             horizon = int(target_col.split('_')[-1].replace('d', ''))
-            train_end_idx = total_rows - (4 - fold_idx) * val_block_size - horizon
+            train_end_idx = total_rows - (max_fold - fold_idx) * val_block_size - horizon
             val_start_idx = train_end_idx
             val_end_idx = min(val_start_idx + val_block_size, total_rows)
             
@@ -135,41 +140,43 @@ def run_regime_stacked_serialized_pipeline(
             oof_meta_preds.extend(meta_preds)
             oof_actuals.extend(y_val.values)
             
-            # If this is the final fold (Fold 3), serialize these exact artifacts for holdout testing
-            if fold_idx == 3:
-                print(f"💾 Serializing Fold 3 artifacts to {artifact_dir}...")
-                joblib.dump(expert_models, os.path.join(artifact_dir, "fold3_expert_models.pkl"))
-                joblib.dump(meta_learner, os.path.join(artifact_dir, "fold3_meta_learner.pkl"))
+            # If this is the final fold, serialize these exact artifacts for holdout testing
+            if fold_idx == (max_fold-1):
+                print(f"💾 Serializing Fold {fold_idx} artifacts to {artifact_dir}...")
+                joblib.dump(expert_models, os.path.join(artifact_dir, "lastfold_expert_models.pkl"))
+                joblib.dump(meta_learner, os.path.join(artifact_dir, "lastfold_meta_learner.pkl"))
                 
         aggregate_ic, _ = spearmanr(oof_meta_preds, oof_actuals)
         print(f"\n🎯 WFO Aggregate OOF Spearman IC: {aggregate_ic:.4f}")
         
-        # 2. Evaluate Untouched Holdout Using Serialized Fold 3 Artifacts
-        print("\n" + "="*50)
-        print("🏆 EVALUATING UNTOUCHED HOLDOUT WITH SERIALIZED FOLD 3 ARTIFACTS")
-        print("="*50)
+        # 2. Evaluate Untouched Holdout Using Serialized Last Fold Artifacts
+        if holdout_size > 0:
         
-        loaded_experts = joblib.load(os.path.join(artifact_dir, "fold3_expert_models.pkl"))
-        loaded_meta = joblib.load(os.path.join(artifact_dir, "fold3_meta_learner.pkl"))
+            print("\n" + "="*50)
+            print(f"🏆 EVALUATING UNTOUCHED HOLDOUT WITH SERIALIZED FOLD {max_fold-1} ARTIFACTS")
+            print("="*50)
         
-        def get_loaded_expert_matrix(df):
-            matrix = np.zeros((len(df), len(regimes)))
-            for idx, regime in enumerate(regimes):
-                if regime in loaded_experts:
-                    exp = loaded_experts[regime]
-                    X_sub = df[[f for f in exp["features"] if f in df.columns]]
-                    matrix[:, idx] = exp["model"].predict(X_sub)
-            return matrix
+            loaded_experts = joblib.load(os.path.join(artifact_dir, "lastfold_expert_models.pkl"))
+            loaded_meta = joblib.load(os.path.join(artifact_dir, "lastfold_meta_learner.pkl"))
+        
+            def get_loaded_expert_matrix(df):
+                matrix = np.zeros((len(df), len(regimes)))
+                for idx, regime in enumerate(regimes):
+                    if regime in loaded_experts:
+                        exp = loaded_experts[regime]
+                        X_sub = df[[f for f in exp["features"] if f in df.columns]]
+                        matrix[:, idx] = exp["model"].predict(X_sub)
+                return matrix
             
-        holdout_meta_X = get_loaded_expert_matrix(holdout_df)
-        holdout_preds = loaded_meta.predict(holdout_meta_X)
+            holdout_meta_X = get_loaded_expert_matrix(holdout_df)
+            holdout_preds = loaded_meta.predict(holdout_meta_X)
         
-        holdout_ic, holdout_pval = spearmanr(holdout_preds, holdout_df[target_col])
-        mlflow.log_metric("serialized_holdout_spearman_ic", holdout_ic)
-        mlflow.log_metric("serialized_holdout_p_value", holdout_pval)
+            holdout_ic, holdout_pval = spearmanr(holdout_preds, holdout_df[target_col])
+            mlflow.log_metric("serialized_holdout_spearman_ic", holdout_ic)
+            mlflow.log_metric("serialized_holdout_p_value", holdout_pval)
         
-        print(f"🔥 STRICT UNTOUCHED HOLDOUT IC: {holdout_ic:.4f} (p-value: {holdout_pval:.4f})")
-        print("="*50)
+            print(f"🔥 STRICT UNTOUCHED HOLDOUT IC: {holdout_ic:.4f} (p-value: {holdout_pval:.4f})")
+            print("="*50)
 
-    print("🏁 Serialized pipeline run successfully completed.")
+        print("🏁 Serialized pipeline run successfully completed.")
 

@@ -11,15 +11,23 @@ TECHNICALS_FEATURES = FEATURE_GROUPS["technicals_and_volatility_features"]
 
 def run_volat_pipeline(
      master_file: str = "data/processed/master_feature_addlhar_alpha.csv",
-     holdout_size: int = 150,
+     holdout_size: int = 600,
      all_features: list[str] = ONCHAIN_FEATURES + DERIVATIVE_FEATURES + TECHNICALS_FEATURES,
      target_col: str = 'target_rv_14d'
 ):
-    
+    print(f"Master file location: {master_file}")
+    print(f"Holdout Size: {holdout_size}")
+    print(f"Target Prediction: {target_col}")
+
     master_df = pd.read_csv(master_file, parse_dates=['date'], index_col='date')
     master_df_clean = master_df.dropna(subset=[target_col, 'close'] + all_features)
     # holdout_df = master_df_clean.iloc[-holdout_size:].copy()
-    wfo_df = master_df_clean.iloc[:-holdout_size].copy()
+    if holdout_size > 0:
+        wfo_df = master_df_clean.iloc[:-holdout_size].copy()
+    else:
+        wfo_df = master_df_clean.copy()
+
+    print(f"Proceed with {len(wfo_df)}-row dataset")
 
     profile_and_save_regime_features(
         wfo_df = wfo_df, 
@@ -71,7 +79,7 @@ def run_volat_pipeline(
         target_col = target_col, 
         lgb_params = best_lgb_params,
         meta_alpha = best_meta_alpha,
-        val_block_size = 246,
+        val_block_size = 120,
         holdout_size = holdout_size,
         profile_dir = "data/regime_profiles_volat",
         artifact_dir = "models/regime_stacked_volat_artifacts",
@@ -83,7 +91,7 @@ if __name__ == '__main__':
         
     run_volat_pipeline(
         master_file = "data/processed/master_feature_addlhar_alpha.csv",
-        holdout_size = 150,
+        holdout_size = 600,
         all_features = ONCHAIN_FEATURES + DERIVATIVE_FEATURES + TECHNICALS_FEATURES,
         target_col = 'target_rv_14d'
     ) 
