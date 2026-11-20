@@ -12,7 +12,7 @@ from src.models.v2_alpha_engine import run_alpha_pipeline
 from src.models.v2_volatility_engine import run_volat_pipeline
 from src.backtest.v2_holdout_gen import holdout_df_generation
 from src.backtest.v2_holdout_gen_live import holdout_df_generation_live
-from src.backtest.v2_backtest_engine import run_volatility_scaled_backtest
+from src.backtest.v2_backtest_engine_period import run_volatility_scaled_backtest
 
 ## Temporary usage
 from src.data.binance_ingestion_engine import run_binance_parquet_ingestion_pipeline
